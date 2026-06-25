@@ -59,11 +59,17 @@ button {
   margin-bottom: 26px;
 }
 
-.brand img {
+.brand-mark {
+  display: grid;
+  place-items: center;
   width: 44px;
   height: 44px;
   border-radius: 8px;
-  object-fit: cover;
+  background: linear-gradient(135deg, var(--accent), #55d6be);
+  color: #10151f;
+  font-weight: 900;
+  font-size: 22px;
+  box-shadow: 0 10px 28px rgba(85, 214, 190, 0.22);
 }
 
 .brand strong,
