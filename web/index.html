@@ -1,1 +1,52 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#10151f">
+    <title>MoniCard Web</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2310151f'/%3E%3Ccircle cx='32' cy='32' r='18' fill='%23fff04a'/%3E%3Cpath d='M23 34h18M27 25h10M27 43h10' stroke='%2310151f' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <img src="../assets/branding/molik-card-logo.jpg" alt="">
+          <div>
+            <strong id="brandName">魔力卡</strong>
+            <span>Web Bluetooth</span>
+          </div>
+        </div>
+        <nav class="nav" id="nav"></nav>
+        <div class="runtime-card">
+          <span id="supportDot" class="dot"></span>
+          <div>
+            <strong id="supportTitle"></strong>
+            <span id="supportText"></span>
+          </div>
+        </div>
+      </aside>
 
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p id="eyebrow"></p>
+            <h1 id="pageTitle"></h1>
+          </div>
+          <div class="topbar-actions">
+            <select id="languageSelect" class="language-select" aria-label="Language"></select>
+            <button id="connectBtn" class="primary-btn" type="button"></button>
+            <button id="disconnectBtn" class="icon-btn" type="button"></button>
+          </div>
+        </header>
+        <section id="statusBanner" class="status-banner"></section>
+        <section id="view" class="view"></section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <input id="filePicker" type="file" hidden>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

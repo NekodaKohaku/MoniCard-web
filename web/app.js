@@ -1,0 +1,3125 @@
+const SERVICE_UUID = "7369666c-695f-7364-0000-000000000000";
+const DATA_CHARACTERISTIC_UUID = "7369666c-695f-7364-0002-000000000000";
+const alternateUuid = (uuid) => {
+  const hex = String(uuid || "").replace(/-/g, "").toLowerCase();
+  if (hex.length !== 32) return uuid;
+  const reversed = hex.match(/../g).reverse().join("");
+  return `${reversed.slice(0, 8)}-${reversed.slice(8, 12)}-${reversed.slice(12, 16)}-${reversed.slice(16, 20)}-${reversed.slice(20)}`;
+};
+const SERVICE_UUIDS = Array.from(new Set([SERVICE_UUID, alternateUuid(SERVICE_UUID)]));
+const DATA_CHARACTERISTIC_UUIDS = Array.from(new Set([DATA_CHARACTERISTIC_UUID, alternateUuid(DATA_CHARACTERISTIC_UUID)]));
+const CATEGORY = { OTA: 1, FILE: 4, CONTROL: 31 };
+const CONTROL_COMMAND = {
+  SET_CARD_INFO: 14,
+  RESP_CARD_INFO: 15,
+  READ_CARD_INFO: 16,
+  RESP_READ_CARD: 17,
+  GET_SERIAL_NUMBER: 18,
+  GET_VERSION: 20,
+  GET_BATTERY: 22,
+  CONTROL_INFO: 24,
+  CONTROL_INFO_RESPONSE: 25,
+  GET_FS_INFO: 32,
+  GET_FS_INFO_RESPONSE: 33,
+  SET_TAGS: 34,
+  RESP_TAGS: 35,
+  READ_CARDS_COUNT: 36,
+  RESP_CARDS_COUNT: 37,
+  READ_CARD_BY_ID: 38,
+  RESP_CARD_BY_ID: 39,
+  DELETE_CARD: 40,
+  RESP_DELETE_CARD: 41,
+  SET_CAROUSEL: 42,
+  RESP_CAROUSEL: 43,
+  READ_CAROUSEL: 44,
+  RESP_CAROUSEL_RD: 45
+};
+const FILE_COMMAND = {
+  START_REQUEST: 0,
+  START_RESPONSE: 1,
+  FILE_SEND_START_REQUEST: 2,
+  FILE_SEND_START_RESPONSE: 3,
+  FILE_SEND_DATA_REQUEST: 4,
+  FILE_SEND_DATA_RESPONSE: 5,
+  FILE_SEND_END_REQUEST: 6,
+  FILE_SEND_END_RESPONSE: 7,
+  END_REQUEST: 8,
+  END_RESPONSE: 9,
+  FILE_INFO_REQUEST: 13,
+  FILE_INFO_RESPONSE: 14
+};
+const SIFLI_OTA_COMMAND = {
+  IMAGE_PACKAGE_START_REQUEST: 38,
+  IMAGE_PACKAGE_START_RESPONSE: 39,
+  IMAGE_PACKAGE_PACKET_REQUEST: 40,
+  IMAGE_PACKAGE_PACKET_RESPONSE: 41,
+  IMAGE_PACKAGE_END_REQUEST: 42,
+  IMAGE_PACKAGE_END_RESPONSE: 43
+};
+const FILE_TYPE = { RESOURCE: 1, IP: 2, PURCHASE: 3, UI: 4 };
+const OTA_PACKAGE_PACKET_BYTES = 2048;
+const CARD_INFO_MAX_BYTES = 319;
+const TAGS_MAX_COUNT = 5;
+const CONTROL_INFO_BYTES = 8;
+const FILE_TRANSFER_FREE_MARGIN_BYTES = 50 * 1024;
+const RESERVED_STORAGE_BYTES = 3 * 1024 * 1024;
+const STORAGE_KEY = "monicard-web-state-v1";
+const LOCALE_STORAGE_KEY = "monicard-web-locale";
+
+const $ = (selector) => document.querySelector(selector);
+const view = $("#view");
+const banner = $("#statusBanner");
+const filePicker = $("#filePicker");
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+
+const i18n = {
+  "zh-Hant": {
+    appTitle: "魔力卡 Web",
+    brandName: "魔力卡",
+    autoLanguage: "跟隨系統",
+    navDevices: "設備",
+    navDetail: "詳情",
+    navCard: "名片",
+    navMedia: "素材",
+    navTags: "標籤",
+    navSettings: "設備設定",
+    navReceived: "收到的卡片",
+    navFirmware: "韌體",
+    navAppSettings: "軟體設定",
+    eyebrowConnected: "已連線",
+    eyebrowWeb: "網頁版",
+    connectDevice: "連線設備",
+    disconnect: "中斷連線",
+    bluetoothReady: "可使用藍牙",
+    bluetoothUnavailable: "藍牙不可用",
+    bluetoothReadyDesc: "請點擊按鈕選擇設備",
+    bluetoothUnsupportedDesc: "目前瀏覽器不支援 Web Bluetooth",
+    bluetoothSecureDesc: "請使用 localhost 或 HTTPS",
+    devicesList: "設備列表",
+    connectNewDevice: "連線新設備",
+    refreshCurrentDevice: "重新整理目前設備",
+    emptyDevices: "還沒有設備。點擊「連線新設備」，在瀏覽器彈窗中選擇你的 MoniCard。",
+    manage: "管理",
+    remove: "移除",
+    noDeviceSelected: "還沒有選擇設備。",
+    serialNumber: "序列號",
+    battery: "電量",
+    firmwareVersion: "韌體",
+    storage: "儲存空間",
+    refreshDeviceStatus: "重新整理設備狀態",
+    saveName: "儲存名稱",
+    deviceName: "設備名稱",
+    cardFeature: "名片",
+    cardFeatureDesc: "編輯並同步個人名片",
+    mediaFeature: "素材",
+    mediaFeatureDesc: "上傳圖片、影片或 GIF",
+    tagsFeature: "標籤",
+    tagsFeatureDesc: "設定同好感應標籤",
+    settingsFeature: "設備設定",
+    settingsFeatureDesc: "燈光、震動、蜂鳴器",
+    receivedFeature: "收到的卡片",
+    receivedFeatureDesc: "同步附近設備名片",
+    firmwareFeature: "韌體",
+    firmwareFeatureDesc: "上傳本機更新檔",
+    cardContent: "名片內容",
+    maxBytes: "最多 {count} bytes",
+    readFromDevice: "從設備讀取",
+    uploadCard: "上傳名片",
+    preview: "預覽",
+    avatarText: "顯示縮寫",
+    noCardContent: "還沒有名片內容",
+    defaultCard: "MoniCard\nQQ：12345678\n我是 Monica",
+    mediaTransfer: "素材傳輸",
+    mediaHelp: "上傳想在設備上顯示的照片、短影片或 GIF。",
+    mediaProcessHelp: "系統會自動調整尺寸與格式；建議使用直式 3:4 素材，顯示效果會更好。",
+    fileType: "素材類型",
+    fileTypeHelp: "支援 JPG、PNG、WebP、常見影片格式與 GIF。",
+    resourceFile: "圖片 / 影片 / GIF",
+    pickAndTransfer: "選擇檔案並傳輸",
+    cancelTransfer: "取消傳輸",
+    waitingFile: "等待選擇檔案",
+    dropMedia: "也可以把圖片、影片或 GIF 拖曳到這裡",
+    dropMediaActive: "放開即可準備傳輸",
+    processingMedia: "正在處理素材格式",
+    mediaPrepared: "已產生設備素材：{name}\n大小：{size}",
+    storageInsufficient: "設備儲存空間不足，需要 {needed}（含安全餘量），目前剩餘約 {free}。請先在設備上刪除部分素材後再試。",
+    tagSettings: "標籤設定",
+    category: "分類",
+    tag: "標籤",
+    addToList: "加入列表",
+    writeToDevice: "寫入設備",
+    tagHint: "最多 5 個標籤，點擊標籤可移除。",
+    deviceSwitches: "設備開關",
+    readSettings: "讀取設備設定",
+    buzzer: "蜂鳴器",
+    buzzerDesc: "遇到同好時發出提示音",
+    vibration: "震動",
+    vibrationDesc: "遇到同好時震動提醒",
+    light: "同好感應燈光",
+    lightDesc: "遇到同好時亮燈閃爍提示",
+    interest: "同好感應",
+    interestDesc: "自動掃描並識別附近的同好設備",
+    ambience: "背面氛圍燈",
+    ambienceDesc: "背面呼吸燈緩慢呼吸閃爍",
+    broadcast: "廣播",
+    broadcastDesc: "允許設備廣播名片與標籤",
+    videoCarousel: "影片輪播",
+    carouselSeconds: "間隔秒數，0 表示關閉",
+    carouselEnabled: "啟用輪播",
+    readCarousel: "讀取輪播",
+    saveCarousel: "儲存輪播",
+    autoReadingSettings: "正在自動讀取設備設定",
+    autoReadSkipped: "連接設備後會自動讀取設定",
+    syncFromDevice: "從設備同步",
+    waitingSync: "等待同步",
+    noReceivedCards: "暫無收到的名片。",
+    firmwareUpgrade: "韌體升級",
+    firmwareHelp: "請選擇可信任的韌體更新檔，並確認設備電量充足後再開始。更新完成並重新連線前，請停留在此頁面。",
+    pickFirmware: "選擇韌體檔",
+    waitingFirmware: "等待選擇韌體檔",
+    firmwareReady: "已讀取韌體檔：{name}\n大小：{size}\n更新期間請勿切換頁面、關閉瀏覽器、讓電腦睡眠，或中斷設備電源。",
+    firmwareInstalling: "傳輸完成，設備正在校驗並安裝更新。",
+    firmwareReconnectHint: "設備已收到更新。請等待約 10 秒後按電源鍵開機，並保持此頁面開啟直到自動重新連線完成。",
+    firmwareVerifying: "正在嘗試重新連線並檢查更新結果…({count})",
+    firmwareVerified: "設備已重新連線，韌體版本：{version}",
+    firmwareVerifyFailed: "尚未自動重新連線。請確認設備已開機後，手動重新連線。",
+    confirmFirmwareUpdate: "確定要開始韌體更新？更新完成並重新連線前，請不要切換頁面、關閉瀏覽器、讓電腦睡眠，或中斷設備電源。",
+    webSettings: "網頁設定",
+    language: "語言",
+    transferDelay: "傳輸包間隔 ms",
+    transferDelayHelp: "每個藍牙資料包之間的等待時間。數值越大越穩但越慢；一般不需要調整。",
+    saveSettings: "儲存設定",
+    exportData: "匯出資料",
+    clearData: "清空網頁資料",
+    migrationNotes: "使用說明",
+    migrationHelp: "請使用 Chrome 或 Edge，並透過 HTTPS 網址開啟。首次連線設備時，瀏覽器會要求你手動選擇並授權。",
+    unnamedDevice: "設備名稱",
+    online: "在線",
+    disconnected: "已中斷連線",
+    card: "名片",
+    chooseDeviceBanner: "請在瀏覽器設備選擇器中選擇 MoniCard。",
+    deviceDisconnected: "設備已中斷連線",
+    connectedToast: "設備已連線",
+    connectFailed: "連線失敗",
+    noDevice: "還沒有設備",
+    deviceUpdated: "設備已更新",
+    updateFailed: "更新失敗",
+    nameSaved: "名稱已儲存",
+    cardRead: "已讀取名片",
+    readFailed: "讀取失敗",
+    cardUploaded: "名片已上傳",
+    uploadFailed: "上傳失敗",
+    transferDone: "素材已傳輸",
+    transferFailed: "傳輸失敗",
+    cancelingTransfer: "正在取消傳輸",
+    maxTags: "最多 {count} 個標籤",
+    tagExists: "標籤已在列表中",
+    tagsWritten: "標籤已寫入",
+    writeFailed: "寫入失敗",
+    settingsRead: "設備設定已讀取",
+    settingsSynced: "設定已同步",
+    syncFailed: "同步失敗",
+    carouselRead: "已讀取輪播",
+    carouselSaved: "輪播已設定",
+    carouselOff: "輪播已關閉",
+    saveFailed: "儲存失敗",
+    syncedCards: "已同步 {count} 張名片",
+    firmwareTransferred: "韌體檔已傳輸",
+    firmwareTransferFailed: "韌體傳輸失敗",
+    settingsSaved: "設定已儲存",
+    dataCleared: "資料已清空",
+    confirmClear: "確定清空網頁本地資料？",
+    filePreparing: "準備傳輸：{name}\n大小：{size}",
+    fileTransferring: "正在傳輸：{name}\n進度：{percent}%",
+    fileComplete: "傳輸完成：{name}",
+    syncingCard: "正在同步第 {index}/{total} 張名片",
+    firmwarePreparing: "正在準備韌體檔：{name}",
+    firmwareProgress: "正在傳輸韌體檔：{percent}%",
+    errorCanceled: "已取消設備選擇",
+    errorBluetooth: "{fallback}：藍牙連線異常",
+    errorTimeout: "{fallback}：設備回應逾時",
+    errorNoConnection: "請先連線設備",
+    errorFirmwareFile: "韌體檔無法讀取，請確認檔案正確。",
+    errorUnsupportedMedia: "不支援此檔案格式，請選擇圖片、影片或 GIF。",
+    errorInvalidGif: "GIF 檔案無法讀取，請改用其他 GIF 或轉成影片後再上傳。",
+    errorMediaEncode: "素材處理失敗，請換一個檔案再試。",
+    errorGeneric: "{fallback}：{message}"
+  },
+  en: {
+    appTitle: "MoniCard Web",
+    brandName: "MoniCard",
+    autoLanguage: "Use system language",
+    navDevices: "Devices",
+    navDetail: "Overview",
+    navCard: "Card",
+    navMedia: "Media",
+    navTags: "Tags",
+    navSettings: "Device Settings",
+    navReceived: "Received Cards",
+    navFirmware: "Firmware",
+    navAppSettings: "App Settings",
+    eyebrowConnected: "Connected",
+    eyebrowWeb: "Web app",
+    connectDevice: "Connect device",
+    disconnect: "Disconnect",
+    bluetoothReady: "Bluetooth ready",
+    bluetoothUnavailable: "Bluetooth unavailable",
+    bluetoothReadyDesc: "Click the button to choose your device",
+    bluetoothUnsupportedDesc: "This browser does not support Web Bluetooth",
+    bluetoothSecureDesc: "Use localhost or HTTPS",
+    devicesList: "Devices",
+    connectNewDevice: "Connect a device",
+    refreshCurrentDevice: "Refresh current device",
+    emptyDevices: "No devices yet. Choose “Connect a device”, then select your MoniCard in the browser prompt.",
+    manage: "Manage",
+    remove: "Remove",
+    noDeviceSelected: "No device selected yet.",
+    serialNumber: "Serial",
+    battery: "Battery",
+    firmwareVersion: "Firmware",
+    storage: "Storage",
+    refreshDeviceStatus: "Refresh status",
+    saveName: "Save name",
+    deviceName: "Device name",
+    cardFeature: "Card",
+    cardFeatureDesc: "Edit and sync your profile card",
+    mediaFeature: "Media",
+    mediaFeatureDesc: "Upload images, videos, or GIFs",
+    tagsFeature: "Tags",
+    tagsFeatureDesc: "Set affinity tags",
+    settingsFeature: "Device Settings",
+    settingsFeatureDesc: "Lights, vibration, and buzzer",
+    receivedFeature: "Received Cards",
+    receivedFeatureDesc: "Sync cards from nearby devices",
+    firmwareFeature: "Firmware",
+    firmwareFeatureDesc: "Upload a local update file",
+    cardContent: "Card details",
+    maxBytes: "Up to {count} bytes",
+    readFromDevice: "Read from device",
+    uploadCard: "Upload card",
+    preview: "Preview",
+    avatarText: "Initials",
+    noCardContent: "No card details yet",
+    defaultCard: "MoniCard\nQQ: 12345678\nHi, I'm Monica.",
+    mediaTransfer: "Media transfer",
+    mediaHelp: "Upload photos, short videos, or GIFs to show on your device.",
+    mediaProcessHelp: "Files are automatically resized and prepared for the display. Portrait 3:4 media works best.",
+    fileType: "Media type",
+    fileTypeHelp: "Supports JPG, PNG, WebP, common video formats, and GIF.",
+    resourceFile: "Image / video / GIF",
+    pickAndTransfer: "Choose file and transfer",
+    cancelTransfer: "Cancel transfer",
+    waitingFile: "Waiting for a file",
+    dropMedia: "You can also drag an image, video, or GIF here",
+    dropMediaActive: "Drop to prepare the transfer",
+    processingMedia: "Preparing media for the device",
+    mediaPrepared: "Prepared device media: {name}\nSize: {size}",
+    storageInsufficient: "Not enough storage on the device. {needed} is required, including a safety margin, and about {free} is available. Delete some media on the device and try again.",
+    tagSettings: "Tag settings",
+    category: "Category",
+    tag: "Tag",
+    addToList: "Add",
+    writeToDevice: "Write to device",
+    tagHint: "Up to 5 tags. Click a tag to remove it.",
+    deviceSwitches: "Device controls",
+    readSettings: "Read device settings",
+    buzzer: "Buzzer",
+    buzzerDesc: "Play a sound when a match is nearby",
+    vibration: "Vibration",
+    vibrationDesc: "Vibrate when a match is nearby",
+    light: "Affinity light",
+    lightDesc: "Flash the light when a match is nearby",
+    interest: "Affinity sensing",
+    interestDesc: "Scan for nearby matching devices",
+    ambience: "Back ambient light",
+    ambienceDesc: "Run the rear breathing light effect",
+    broadcast: "Broadcast",
+    broadcastDesc: "Allow the device to broadcast cards and tags",
+    videoCarousel: "Video carousel",
+    carouselSeconds: "Interval in seconds. Use 0 to turn it off",
+    carouselEnabled: "Enable carousel",
+    readCarousel: "Read carousel",
+    saveCarousel: "Save carousel",
+    autoReadingSettings: "Reading device settings automatically",
+    autoReadSkipped: "Settings will be read automatically after a device is connected",
+    syncFromDevice: "Sync from device",
+    waitingSync: "Waiting to sync",
+    noReceivedCards: "No received cards yet.",
+    firmwareUpgrade: "Firmware update",
+    firmwareHelp: "Choose a trusted firmware update file, and make sure the device has enough battery before starting. Stay on this page until the update reconnects.",
+    pickFirmware: "Choose firmware file",
+    waitingFirmware: "Waiting for a firmware file",
+    firmwareReady: "Firmware file loaded: {name}\nSize: {size}\nDo not switch pages, close the browser, let the computer sleep, or power off the device during the update.",
+    firmwareInstalling: "Transfer complete. The device is verifying and installing the update.",
+    firmwareReconnectHint: "The device has received the update. Wait about 10 seconds, press the power button, and keep this page open until automatic reconnection finishes.",
+    firmwareVerifying: "Trying to reconnect and verify the update…({count})",
+    firmwareVerified: "Device reconnected. Firmware version: {version}",
+    firmwareVerifyFailed: "Automatic reconnection did not finish. Power on the device, then reconnect manually.",
+    confirmFirmwareUpdate: "Start the firmware update? Until the update reconnects, do not switch pages, close the browser, let the computer sleep, or power off the device.",
+    webSettings: "Web app settings",
+    language: "Language",
+    transferDelay: "Packet delay, ms",
+    transferDelayHelp: "Delay between Bluetooth packets. Higher values can be more stable but slower. Most users should leave this unchanged.",
+    saveSettings: "Save settings",
+    exportData: "Export data",
+    clearData: "Clear web data",
+    migrationNotes: "Usage notes",
+    migrationHelp: "Use Chrome or Edge and open the app from an HTTPS address. The browser will ask you to choose and authorize the device the first time you connect.",
+    unnamedDevice: "Device name",
+    online: "Online",
+    disconnected: "Disconnected",
+    card: "Card",
+    chooseDeviceBanner: "Select your MoniCard in the browser’s device picker.",
+    deviceDisconnected: "Device disconnected",
+    connectedToast: "Device connected",
+    connectFailed: "Couldn’t connect",
+    noDevice: "No devices yet",
+    deviceUpdated: "Device updated",
+    updateFailed: "Update failed",
+    nameSaved: "Name saved",
+    cardRead: "Card loaded",
+    readFailed: "Read failed",
+    cardUploaded: "Card uploaded",
+    uploadFailed: "Upload failed",
+    transferDone: "Media transferred",
+    transferFailed: "Transfer failed",
+    cancelingTransfer: "Canceling transfer",
+    maxTags: "Up to {count} tags",
+    tagExists: "That tag is already in the list",
+    tagsWritten: "Tags written",
+    writeFailed: "Write failed",
+    settingsRead: "Device settings loaded",
+    settingsSynced: "Settings synced",
+    syncFailed: "Sync failed",
+    carouselRead: "Carousel loaded",
+    carouselSaved: "Carousel saved",
+    carouselOff: "Carousel turned off",
+    saveFailed: "Save failed",
+    syncedCards: "Synced {count} cards",
+    firmwareTransferred: "Firmware file transferred",
+    firmwareTransferFailed: "Firmware transfer failed",
+    settingsSaved: "Settings saved",
+    dataCleared: "Data cleared",
+    confirmClear: "Clear local web app data?",
+    filePreparing: "Preparing transfer: {name}\nSize: {size}",
+    fileTransferring: "Transferring: {name}\nProgress: {percent}%",
+    fileComplete: "Transfer complete: {name}",
+    syncingCard: "Syncing card {index} of {total}",
+    firmwarePreparing: "Preparing firmware file: {name}",
+    firmwareProgress: "Transferring firmware file: {percent}%",
+    errorCanceled: "Device selection canceled",
+    errorBluetooth: "{fallback}: Bluetooth connection error",
+    errorTimeout: "{fallback}: device response timed out",
+    errorNoConnection: "Connect a device first",
+    errorFirmwareFile: "This firmware file could not be read. Check that you selected the correct file.",
+    errorUnsupportedMedia: "This file type is not supported. Choose an image, video, or GIF.",
+    errorInvalidGif: "This GIF could not be read. Try another GIF or convert it to a video first.",
+    errorMediaEncode: "Media processing failed. Try another file.",
+    errorGeneric: "{fallback}: {message}"
+  },
+  ja: {
+    appTitle: "MoniCard Web",
+    brandName: "MoniCard",
+    autoLanguage: "システム設定に合わせる",
+    navDevices: "デバイス",
+    navDetail: "概要",
+    navCard: "カード",
+    navMedia: "メディア",
+    navTags: "タグ",
+    navSettings: "デバイス設定",
+    navReceived: "受信カード",
+    navFirmware: "ファームウェア",
+    navAppSettings: "アプリ設定",
+    eyebrowConnected: "接続中",
+    eyebrowWeb: "Web 版",
+    connectDevice: "デバイスを接続",
+    disconnect: "切断",
+    bluetoothReady: "Bluetooth 使用可",
+    bluetoothUnavailable: "Bluetooth 使用不可",
+    bluetoothReadyDesc: "ボタンを押してデバイスを選択してください",
+    bluetoothUnsupportedDesc: "このブラウザは Web Bluetooth に対応していません",
+    bluetoothSecureDesc: "localhost または HTTPS で開いてください",
+    devicesList: "デバイス",
+    connectNewDevice: "デバイスを接続",
+    refreshCurrentDevice: "現在のデバイスを更新",
+    emptyDevices: "まだデバイスがありません。「デバイスを接続」を押して、ブラウザの選択画面から MoniCard を選んでください。",
+    manage: "管理",
+    remove: "削除",
+    noDeviceSelected: "デバイスが選択されていません。",
+    serialNumber: "シリアル",
+    battery: "バッテリー",
+    firmwareVersion: "ファームウェア",
+    storage: "ストレージ",
+    refreshDeviceStatus: "状態を更新",
+    saveName: "名前を保存",
+    deviceName: "デバイス名",
+    cardFeature: "カード",
+    cardFeatureDesc: "プロフィールカードを編集して同期",
+    mediaFeature: "メディア",
+    mediaFeatureDesc: "画像、動画、GIFを転送",
+    tagsFeature: "タグ",
+    tagsFeatureDesc: "マッチング用タグを設定",
+    settingsFeature: "デバイス設定",
+    settingsFeatureDesc: "ライト、振動、ブザー",
+    receivedFeature: "受信カード",
+    receivedFeatureDesc: "近くのデバイスからカードを同期",
+    firmwareFeature: "ファームウェア",
+    firmwareFeatureDesc: "ローカルの更新ファイルを転送",
+    cardContent: "カード内容",
+    maxBytes: "最大 {count} バイト",
+    readFromDevice: "デバイスから読み込み",
+    uploadCard: "カードを送信",
+    preview: "プレビュー",
+    avatarText: "表示文字",
+    noCardContent: "カード内容はまだありません",
+    defaultCard: "MoniCard\nQQ：12345678\nMonicaです",
+    mediaTransfer: "メディア転送",
+    mediaHelp: "デバイスに表示したい写真、ショート動画、GIFをアップロードできます。",
+    mediaProcessHelp: "表示に合わせてサイズと形式を自動調整します。縦長の3:4素材がおすすめです。",
+    fileType: "メディア種別",
+    fileTypeHelp: "JPG、PNG、WebP、主要な動画形式、GIFに対応しています。",
+    resourceFile: "画像 / 動画 / GIF",
+    pickAndTransfer: "ファイルを選んで転送",
+    cancelTransfer: "転送をキャンセル",
+    waitingFile: "ファイルの選択待ち",
+    dropMedia: "画像、動画、GIFをここにドラッグして選択できます",
+    dropMediaActive: "ドロップすると転送準備を開始します",
+    processingMedia: "デバイス用メディアを作成しています",
+    mediaPrepared: "デバイス用メディアを作成しました：{name}\nサイズ：{size}",
+    storageInsufficient: "デバイスの空き容量が不足しています。安全マージン込みで {needed} が必要ですが、空き容量は約 {free} です。デバイス側で不要なメディアを削除してから再度お試しください。",
+    tagSettings: "タグ設定",
+    category: "カテゴリ",
+    tag: "タグ",
+    addToList: "追加",
+    writeToDevice: "デバイスに書き込み",
+    tagHint: "タグは最大 5 個です。タグをクリックすると削除できます。",
+    deviceSwitches: "デバイス制御",
+    readSettings: "設定を読み込み",
+    buzzer: "ブザー",
+    buzzerDesc: "近くにマッチする相手がいると音で通知",
+    vibration: "振動",
+    vibrationDesc: "近くにマッチする相手がいると振動で通知",
+    light: "マッチングライト",
+    lightDesc: "マッチ時にライトを点滅",
+    interest: "マッチング検知",
+    interestDesc: "近くの対応デバイスをスキャン",
+    ambience: "背面アンビエントライト",
+    ambienceDesc: "背面ライトをゆっくり点滅",
+    broadcast: "ブロードキャスト",
+    broadcastDesc: "カードとタグの発信を許可",
+    videoCarousel: "動画カルーセル",
+    carouselSeconds: "切替間隔（秒）。0 でオフ",
+    carouselEnabled: "カルーセルを有効にする",
+    readCarousel: "設定を読み込み",
+    saveCarousel: "保存",
+    autoReadingSettings: "デバイス設定を自動で読み込んでいます",
+    autoReadSkipped: "デバイス接続後、設定を自動で読み込みます",
+    syncFromDevice: "デバイスから同期",
+    waitingSync: "同期待ち",
+    noReceivedCards: "受信カードはまだありません。",
+    firmwareUpgrade: "ファームウェア更新",
+    firmwareHelp: "信頼できるファームウェア更新ファイルを選び、デバイスのバッテリー残量を確認してから開始してください。更新後の再接続が完了するまで、このページを開いたままにしてください。",
+    pickFirmware: "ファームウェアファイルを選択",
+    waitingFirmware: "ファームウェアファイルの選択待ち",
+    firmwareReady: "ファームウェアファイルを読み込みました：{name}\nサイズ：{size}\n更新中はページを切り替えず、ブラウザを閉じず、PCをスリープさせず、デバイスの電源を切らないでください。",
+    firmwareInstalling: "転送が完了しました。デバイス側で確認とインストールを行っています。",
+    firmwareReconnectHint: "デバイスが更新を受信しました。約10秒待ってから電源ボタンを押し、自動再接続が完了するまでこのページを開いたままにしてください。",
+    firmwareVerifying: "再接続して更新結果を確認しています…({count})",
+    firmwareVerified: "デバイスに再接続しました。ファームウェア：{version}",
+    firmwareVerifyFailed: "自動再接続が完了しませんでした。デバイスの電源を入れてから手動で再接続してください。",
+    confirmFirmwareUpdate: "ファームウェア更新を開始しますか？更新後の再接続が完了するまで、ページを切り替えず、ブラウザを閉じず、PCをスリープさせず、デバイスの電源を切らないでください。",
+    webSettings: "Web アプリ設定",
+    language: "言語",
+    transferDelay: "パケット間隔 ms",
+    transferDelayHelp: "Bluetooth パケット間の待ち時間です。大きいほど安定しやすくなりますが遅くなります。通常は変更不要です。",
+    saveSettings: "設定を保存",
+    exportData: "データを書き出し",
+    clearData: "Web データを消去",
+    migrationNotes: "ご利用メモ",
+    migrationHelp: "Chrome または Edge で、HTTPS のURLから開いてください。初回接続時は、ブラウザ上でデバイスを選択して許可する必要があります。",
+    unnamedDevice: "デバイス名",
+    online: "オンライン",
+    disconnected: "切断済み",
+    card: "カード",
+    chooseDeviceBanner: "ブラウザのデバイス選択画面で MoniCard を選んでください。",
+    deviceDisconnected: "デバイスが切断されました",
+    connectedToast: "デバイスを接続しました",
+    connectFailed: "接続できませんでした",
+    noDevice: "デバイスがありません",
+    deviceUpdated: "デバイスを更新しました",
+    updateFailed: "更新に失敗しました",
+    nameSaved: "名前を保存しました",
+    cardRead: "カードを読み込みました",
+    readFailed: "読み込みに失敗しました",
+    cardUploaded: "カードを送信しました",
+    uploadFailed: "送信に失敗しました",
+    transferDone: "メディアを転送しました",
+    transferFailed: "転送に失敗しました",
+    cancelingTransfer: "転送をキャンセルしています",
+    maxTags: "タグは最大 {count} 個です",
+    tagExists: "このタグはすでに追加されています",
+    tagsWritten: "タグを書き込みました",
+    writeFailed: "書き込みに失敗しました",
+    settingsRead: "設定を読み込みました",
+    settingsSynced: "設定を同期しました",
+    syncFailed: "同期に失敗しました",
+    carouselRead: "カルーセル設定を読み込みました",
+    carouselSaved: "カルーセルを保存しました",
+    carouselOff: "カルーセルをオフにしました",
+    saveFailed: "保存に失敗しました",
+    syncedCards: "{count} 枚のカードを同期しました",
+    firmwareTransferred: "ファームウェアを転送しました",
+    firmwareTransferFailed: "ファームウェア転送に失敗しました",
+    settingsSaved: "設定を保存しました",
+    dataCleared: "データを消去しました",
+    confirmClear: "Web アプリのローカルデータを消去しますか？",
+    filePreparing: "転送準備中：{name}\nサイズ：{size}",
+    fileTransferring: "転送中：{name}\n進捗：{percent}%",
+    fileComplete: "転送完了：{name}",
+    syncingCard: "{index}/{total} 枚目のカードを同期中",
+    firmwarePreparing: "ファームウェア転送中：{name}",
+    firmwareProgress: "ファームウェア転送中：{percent}%",
+    errorCanceled: "デバイス選択をキャンセルしました",
+    errorBluetooth: "{fallback}：Bluetooth 接続エラー",
+    errorTimeout: "{fallback}：デバイスの応答がタイムアウトしました",
+    errorNoConnection: "先にデバイスを接続してください",
+    errorFirmwareFile: "ファームウェアファイルを読み込めませんでした。正しいファイルを選択してください。",
+    errorUnsupportedMedia: "このファイル形式には対応していません。画像、動画、GIFを選択してください。",
+    errorInvalidGif: "このGIFを読み込めませんでした。別のGIFを使うか、動画に変換してからアップロードしてください。",
+    errorMediaEncode: "メディアの処理に失敗しました。別のファイルでお試しください。",
+    errorGeneric: "{fallback}：{message}"
+  }
+};
+
+const localeNames = {
+  auto: "Auto",
+  "zh-Hant": "繁體中文",
+  en: "English",
+  ja: "日本語"
+};
+
+function detectLocale() {
+  const saved = localStorage.getItem(LOCALE_STORAGE_KEY);
+  if (saved && saved !== "auto") return saved;
+  const language = (navigator.languages && navigator.languages[0] || navigator.language || "").toLowerCase();
+  if (language.startsWith("ja")) return "ja";
+  if (language.startsWith("en")) return "en";
+  return "zh-Hant";
+}
+
+function currentLocale() {
+  return i18n[state.locale || detectLocale()] ? state.locale || detectLocale() : "zh-Hant";
+}
+
+function t(key, params = {}) {
+  const locale = currentLocale();
+  const template = i18n[locale][key] || i18n["zh-Hant"][key] || key;
+  return template.replace(/\{(\w+)\}/g, (_, name) => params[name] ?? "");
+}
+
+const categoryLocaleMap = {
+  "国产手游": { "zh-Hant": "中國手遊", en: "Chinese Mobile Games", ja: "中国モバイルゲーム" },
+  "国产IP改编手游": { "zh-Hant": "中國 IP 改編手遊", en: "Chinese IP Mobile Games", ja: "中国IP原作モバイルゲーム" },
+  "国产动画": { "zh-Hant": "中國動畫", en: "Chinese Animation", ja: "中国アニメ" },
+  "日系动画": { "zh-Hant": "日系動畫", en: "Japanese Anime", ja: "日本アニメ" },
+  "日系手游": { "zh-Hant": "日系手遊", en: "Japanese Mobile Games", ja: "日本モバイルゲーム" },
+  "日系游戏": { "zh-Hant": "日系遊戲", en: "Japanese Games", ja: "日本ゲーム" },
+  "欧美游戏": { "zh-Hant": "歐美遊戲", en: "Western Games", ja: "欧米ゲーム" },
+  "国产动画电影": { "zh-Hant": "中國動畫電影", en: "Chinese Animated Films", ja: "中国アニメ映画" },
+  "国产漫画": { "zh-Hant": "中國漫畫", en: "Chinese Comics", ja: "中国コミック" },
+  "国产网文": { "zh-Hant": "中國網文", en: "Chinese Web Novels", ja: "中国Web小説" },
+  "国产游戏": { "zh-Hant": "中國遊戲", en: "Chinese Games", ja: "中国ゲーム" },
+  "音游": { "zh-Hant": "音遊", en: "Rhythm Games", ja: "音楽ゲーム" },
+  "潮玩": { "zh-Hant": "潮玩", en: "Designer Toys", ja: "デザイナーズトイ" }
+};
+
+const titleLocaleMap = {
+  "《原神》": { en: "Genshin Impact", ja: "原神" },
+  "《崩坏：星穹铁道》": { "zh-Hant": "《崩壞：星穹鐵道》", en: "Honkai: Star Rail", ja: "崩壊：スターレイル" },
+  "《绝区零》": { "zh-Hant": "《絕區零》", en: "Zenless Zone Zero", ja: "ゼンレスゾーンゼロ" },
+  "《崩坏3》": { "zh-Hant": "《崩壞3》", en: "Honkai Impact 3rd", ja: "崩壊3rd" },
+  "《明日方舟》": { en: "Arknights", ja: "アークナイツ" },
+  "《恋与深空》": { "zh-Hant": "《戀與深空》", en: "Love and Deepspace", ja: "恋と深空" },
+  "《战双帕弥什》": { "zh-Hant": "《戰雙帕彌什》", en: "Punishing: Gray Raven", ja: "パニシング：グレイレイヴン" },
+  "《阴阳师》": { "zh-Hant": "《陰陽師》", en: "Onmyoji", ja: "陰陽師" },
+  "《少女前线》": { "zh-Hant": "《少女前線》", en: "Girls' Frontline", ja: "ドールズフロントライン" },
+  "《王者荣耀》": { "zh-Hant": "《王者榮耀》", en: "Honor of Kings", ja: "Honor of Kings" },
+  "《鸣潮》": { "zh-Hant": "《鳴潮》", en: "Wuthering Waves", ja: "鳴潮" },
+  "《无限暖暖》": { "zh-Hant": "《無限暖暖》", en: "Infinity Nikki", ja: "インフィニティニキ" },
+  "《闪耀暖暖》": { "zh-Hant": "《閃耀暖暖》", en: "Shining Nikki", ja: "シャイニングニキ" },
+  "《重返未来：1999》": { "zh-Hant": "《重返未來：1999》", en: "Reverse: 1999", ja: "リバース：1999" },
+  "《蔚蓝档案》": { "zh-Hant": "《蔚藍檔案》", en: "Blue Archive", ja: "ブルーアーカイブ" },
+  "《第五人格》": { en: "Identity V", ja: "Identity V" },
+  "《碧蓝航线》": { "zh-Hant": "《碧藍航線》", en: "Azur Lane", ja: "アズールレーン" },
+  "《幻塔》": { en: "Tower of Fantasy", ja: "Tower of Fantasy" },
+  "《罗小黑战记》": { "zh-Hant": "《羅小黑戰記》", en: "The Legend of Hei", ja: "羅小黒戦記" },
+  "《时光代理人》": { "zh-Hant": "《時光代理人》", en: "Link Click", ja: "時光代理人 -LINK CLICK-" },
+  "《天官赐福》": { "zh-Hant": "《天官賜福》", en: "Heaven Official's Blessing", ja: "天官賜福" },
+  "《斗罗大陆》": { "zh-Hant": "《斗羅大陸》", en: "Soul Land", ja: "斗羅大陸" },
+  "《魔道祖师》": { "zh-Hant": "《魔道祖師》", en: "Mo Dao Zu Shi", ja: "魔道祖師" },
+  "《药师少女的独语》": { "zh-Hant": "《藥師少女的獨語》", en: "The Apothecary Diaries", ja: "薬屋のひとりごと" },
+  "《间谍过家家》": { "zh-Hant": "《間諜家家酒》", en: "SPY x FAMILY", ja: "SPY×FAMILY" },
+  "《进击的巨人》": { "zh-Hant": "《進擊的巨人》", en: "Attack on Titan", ja: "進撃の巨人" },
+  "《咒术回战》": { "zh-Hant": "《咒術迴戰》", en: "Jujutsu Kaisen", ja: "呪術廻戦" },
+  "《海贼王》": { "zh-Hant": "《航海王》", en: "ONE PIECE", ja: "ONE PIECE" },
+  "《我独自升级》": { "zh-Hant": "《我獨自升級》", en: "Solo Leveling", ja: "俺だけレベルアップな件" },
+  "《鬼灭之刃》": { "zh-Hant": "《鬼滅之刃》", en: "Demon Slayer: Kimetsu no Yaiba", ja: "鬼滅の刃" },
+  "《火影忍者》": { en: "Naruto", ja: "NARUTO -ナルト-" },
+  "《龙珠》": { "zh-Hant": "《七龍珠》", en: "Dragon Ball", ja: "ドラゴンボール" },
+  "《哆啦A梦》": { "zh-Hant": "《哆啦A夢》", en: "Doraemon", ja: "ドラえもん" },
+  "《美少女战士》": { "zh-Hant": "《美少女戰士》", en: "Sailor Moon", ja: "美少女戦士セーラームーン" },
+  "《新世纪福音战士》": { "zh-Hant": "《新世紀福音戰士》", en: "Neon Genesis Evangelion", ja: "新世紀エヴァンゲリオン" },
+  "《机动战士高达》": { "zh-Hant": "《機動戰士鋼彈》", en: "Mobile Suit Gundam", ja: "機動戦士ガンダム" },
+  "《电锯人》": { "zh-Hant": "《鏈鋸人》", en: "Chainsaw Man", ja: "チェンソーマン" },
+  "《灌篮高手》": { "zh-Hant": "《灌籃高手》", en: "Slam Dunk", ja: "SLAM DUNK" },
+  "《钢之炼金术师》": { "zh-Hant": "《鋼之鍊金術師》", en: "Fullmetal Alchemist", ja: "鋼の錬金術師" },
+  "《刀剑神域》": { "zh-Hant": "《刀劍神域》", en: "Sword Art Online", ja: "ソードアート・オンライン" },
+  "《葬送的芙莉莲》": { "zh-Hant": "《葬送的芙莉蓮》", en: "Frieren: Beyond Journey's End", ja: "葬送のフリーレン" },
+  "《命运-冠位指定》": { "zh-Hant": "《命運－冠位指定》", en: "Fate/Grand Order", ja: "Fate/Grand Order" },
+  "《怪物弹珠》": { "zh-Hant": "《怪物彈珠》", en: "Monster Strike", ja: "モンスターストライク" },
+  "《公主连结Re:Dive》": { "zh-Hant": "《超異域公主連結☆Re:Dive》", en: "Princess Connect! Re:Dive", ja: "プリンセスコネクト！Re:Dive" },
+  "《塞尔达传说》": { "zh-Hant": "《薩爾達傳說》", en: "The Legend of Zelda", ja: "ゼルダの伝説" },
+  "《超级马力欧》": { "zh-Hant": "《超級瑪利歐》", en: "Super Mario", ja: "スーパーマリオ" },
+  "《最终幻想》": { "zh-Hant": "《Final Fantasy》", en: "Final Fantasy", ja: "ファイナルファンタジー" },
+  "《勇者斗恶龙》": { "zh-Hant": "《勇者鬥惡龍》", en: "Dragon Quest", ja: "ドラゴンクエスト" },
+  "《生化危机》": { "zh-Hant": "《惡靈古堡》", en: "Resident Evil", ja: "バイオハザード" },
+  "《街头霸王》": { "zh-Hant": "《快打旋風》", en: "Street Fighter", ja: "ストリートファイター" },
+  "《艾尔登法环》": { "zh-Hant": "《艾爾登法環》", en: "Elden Ring", ja: "ELDEN RING" },
+  "《英雄联盟》": { "zh-Hant": "《英雄聯盟》", en: "League of Legends", ja: "リーグ・オブ・レジェンド" },
+  "《无畏契约》": { "zh-Hant": "《特戰英豪》", en: "VALORANT", ja: "VALORANT" },
+  "《使命召唤》": { "zh-Hant": "《決勝時刻》", en: "Call of Duty", ja: "Call of Duty" },
+  "《侠盗猎车手》": { "zh-Hant": "《俠盜獵車手》", en: "Grand Theft Auto", ja: "グランド・セフト・オート" },
+  "《魔兽世界》": { "zh-Hant": "《魔獸世界》", en: "World of Warcraft", ja: "World of Warcraft" },
+  "《守望先锋》": { "zh-Hant": "《鬥陣特攻》", en: "Overwatch", ja: "オーバーウォッチ" },
+  "《赛博朋克2077》": { "zh-Hant": "《電馭叛客2077》", en: "Cyberpunk 2077", ja: "サイバーパンク2077" },
+  "《刺客信条》": { "zh-Hant": "《刺客教條》", en: "Assassin's Creed", ja: "アサシン クリード" },
+  "《古墓丽影》": { "zh-Hant": "《古墓奇兵》", en: "Tomb Raider", ja: "トゥームレイダー" },
+  "《最后生还者》": { "zh-Hant": "《最後生還者》", en: "The Last of Us", ja: "The Last of Us" },
+  "《黑神话：悟空》": { "zh-Hant": "《黑神話：悟空》", en: "Black Myth: Wukong", ja: "黒神話：悟空" },
+  "《初音未来：歌姬计划》": { "zh-Hant": "《初音未來：歌姬計畫》", en: "Hatsune Miku: Project DIVA", ja: "初音ミク -Project DIVA-" },
+  "《美乐蒂》": { "zh-Hant": "《美樂蒂》", en: "My Melody", ja: "マイメロディ" },
+  "《玉桂狗》": { en: "Cinnamoroll", ja: "シナモロール" },
+  "《库洛米》": { "zh-Hant": "《酷洛米》", en: "Kuromi", ja: "クロミ" },
+  "《懒蛋蛋》": { "zh-Hant": "《蛋黃哥》", en: "Gudetama", ja: "ぐでたま" },
+  // User-provided title dictionary. Later entries intentionally override earlier guesses.
+  "《崩坏：学园2》": {"zh-Hant": "《崩壞：學園2》", "en": "Honkai Gakuen 2 / Guns Girl Z", "ja": "崩壊学園"},
+  "《明日方舟：终末地》": {"zh-Hant": "《明日方舟：終末地》", "en": "Arknights: Endfield", "ja": "アークナイツ：エンドフィールド"},
+  "《深空之眼》": {"zh-Hant": "《深空之眼》", "en": "Aether Gazer", "ja": "エーテルゲイザー"},
+  "《苍雾世界》": {"zh-Hant": "《蒼霧世界》", "en": "Azure Mist World (暫譯)", "ja": "蒼霧世界 (暫譯)"},
+  "《少女前线2：追放》": {"zh-Hant": "《少女前線2：追放》", "en": "Girls' Frontline 2: Exilium", "ja": "ドールズフロントライン2：エクシリウム"},
+  "《光与夜之恋》": {"zh-Hant": "《光與夜之戀》", "en": "Light and Night", "ja": "光と夜の恋"},
+  "《星痕共鸣》": {"zh-Hant": "《星痕共鳴》", "en": "Resonance of Star (暫譯)", "ja": "星痕共鳴 (暫譯)"},
+  "《蓝色星原：旅谣》": {"zh-Hant": "《藍色星原：旅謠》", "en": "Azur Promilia", "ja": "アズールプロミリア"},
+  "《偶像梦幻祭2》": {"zh-Hant": "《偶像夢幻祭2》", "en": "Ensemble Stars!! Music", "ja": "あんさんぶるスターズ！！Music"},
+  "《异环》": {"zh-Hant": "《異環》", "en": "Neverness to Everness (NTE)", "ja": "異環（Neverness to Everness）"},
+  "《洛克王国：世界》": {"zh-Hant": "《洛克王國：世界》", "en": "Roco Kingdom: World", "ja": "ロックキングダム：ワールド"},
+  "《和平精英》": {"zh-Hant": "《和平精英》", "en": "Game for Peace / PUBG Mobile", "ja": "ゲーム・フォー・ピース / PUBG MOBILE"},
+  "《蛋仔派对》": {"zh-Hant": "《蛋仔派對》", "en": "Eggy Party", "ja": "エギーパーティー"},
+  "《逆水寒手游》": {"zh-Hant": "《逆水寒手遊》", "en": "Justice Mobile", "ja": "逆水寒（Justice）"},
+  "《梦幻西游手游》": {"zh-Hant": "《夢幻西遊手遊》", "en": "Fantasy Westward Journey Mobile", "ja": "夢幻西遊"},
+  "《大话西游手游》": {"zh-Hant": "《大話西遊手遊》", "en": "Westward Journey Online Mobile", "ja": "大話西遊"},
+  "《倩女幽魂手游》": {"zh-Hant": "《倩女幽魂手遊》", "en": "A Chinese Ghost Story Mobile", "ja": "チャイニーズゴーストストーリー"},
+  "《天涯明月刀手游》": {"zh-Hant": "《天涯明月刀手遊》", "en": "Moonlight Blade Mobile", "ja": "天涯明月刀"},
+  "《一梦江湖》": {"zh-Hant": "《一夢江湖》", "en": "Sword and Fairy / Life Makeover", "ja": "一夢江湖"},
+  "《率土之滨》": {"zh-Hant": "《率土之濱》", "en": "Infinite Borders", "ja": "大三国志"},
+  "《荒野行动》": {"zh-Hant": "《荒野行動》", "en": "Knives Out", "ja": "荒野行動"},
+  "《三角洲行动》": {"zh-Hant": "《三角洲行動》", "en": "Delta Force: Hawk Ops", "ja": "Delta Force: Hawk Ops"},
+  "《暗区突围》": {"zh-Hant": "《暗區突圍》", "en": "Arena Breakout", "ja": "アリーナブレイクアウト"},
+  "《永劫无间手游》": {"zh-Hant": "《永劫無間手遊》", "en": "NARAKA: BLADEPOINT Mobile", "ja": "NARAKA: BLADEPOINT Mobile"},
+  "《无尽冬日》": {"zh-Hant": "《無盡冬日》", "en": "Whiteout Survival", "ja": "ホワイトアウト・サバイバル"},
+  "《寒霜启示录》": {"zh-Hant": "《寒霜啟示錄》", "en": "Frostpunk: Beyond the Ice", "ja": "フロストパンク：ビヨンド・ザ・アイス"},
+  "《万国觉醒》": {"zh-Hant": "《萬國覺醒》", "en": "Rise of Kingdoms", "ja": "ライズ オブ キングダム"},
+  "《剑与远征》": {"zh-Hant": "《劍與遠征》", "en": "AFK Arena", "ja": "AFKアリーナ"},
+  "《白夜极光》": {"zh-Hant": "《白夜極光》", "en": "Alchemy Stars", "ja": "白夜極光"},
+  "《尘白禁区》": {"zh-Hant": "《塵白禁區》", "en": "Snowbreak: Containment Zone", "ja": "スノウブレイク：禁域降臨"},
+  "《奇迹暖暖》": {"zh-Hant": "《奇迹暖暖》", "en": "Love Nikki-Dress UP Queen", "ja": "ミラクルニキ"},
+  "《以闪亮之名》": {"zh-Hant": "《以閃亮之名》", "en": "Life Makeover", "ja": "きらめきパラダイス"},
+  "《香肠派对》": {"zh-Hant": "《香腸派對》", "en": "Sausage Man", "ja": "ソーセージマン"},
+  "《最强蜗牛》": {"zh-Hant": "《最強蝸牛》", "en": "Super Snail", "ja": "最強でんでん"},
+  "《一念逍遥》": {"zh-Hant": "《一念逍遙》", "en": "Overmortal", "ja": "仙境修行（暫譯）"},
+  "《无期迷途》": {"zh-Hant": "《無期迷途》", "en": "Path to Nowhere", "ja": "無期迷途"},
+  "《燕云十六声》": {"zh-Hant": "《燕雲十六聲》", "en": "Where Winds Meet", "ja": "Where Winds Meet"},
+  "《白猫Project》": {"zh-Hant": "《白貓Project》", "en": "White Cat Project", "ja": "白猫プロジェクト"},
+  "《第七史诗》": {"zh-Hant": "《第七史詩》", "en": "Epic Seven", "ja": "エピックセブン"},
+  "《智龙迷城》": {"zh-Hant": "《智龍迷城》", "en": "Puzzle & Dragons", "ja": "パズル＆ドラゴンズ"},
+  "《碧蓝幻想》": {"zh-Hant": "《碧藍幻想》", "en": "Granblue Fantasy", "ja": "グランブルーファンタジー"},
+  "《赛马娘 芦毛灰姑娘》": {"zh-Hant": "《賽馬娘 蘆毛灰姑娘》", "en": "Umamusume: Cinderella Gray", "ja": "ウマ娘 シンデレラグレイ"},
+  "《闪耀！优俊少女》": {"zh-Hant": "《閃耀！優俊少女》", "en": "Umamusume: Pretty Derby", "ja": "ウマ娘 プリティーダービー"},
+  "《胜利女神：新的希望》": {"zh-Hant": "《勝利女神：新的希望》", "en": "GODDESS OF VICTORY: NIKKE", "ja": "勝利の女神：NIKKE"},
+  "《SAKAMOTO DAYS 坂本日常》": {"zh-Hant": "《SAKAMOTO DAYS 坂本日常》", "en": "Sakamoto Days", "ja": "SAKAMOTO DAYS"},
+  "《黑执事 绿之魔女篇》": {"zh-Hant": "《黑執事 綠之魔女篇》", "en": "Black Butler: Emerald Witch Arc", "ja": "黒執事 緑の魔女編"},
+  "《咒术回战 死灭洄游》": {"zh-Hant": "《咒術迴戰 死滅迴游》", "en": "Jujutsu Kaisen: Culling Game", "ja": "呪術廻戦 死滅回游"},
+  "《更衣人偶坠入爱河》": {"zh-Hant": "《戀上換裝娃娃》", "en": "My Dress-Up Darling", "ja": "その着せ替え人形は恋をする"},
+  "《Re：从零开始的异世界生活》": {"zh-Hant": "《Re：從零開始的異世界生活》", "en": "Re:Zero - Starting Life in Another World", "ja": "Re:ゼロから始める異世界生活"},
+  "《鬼灭之刃 柱训练篇》": {"zh-Hant": "《鬼滅之刃 柱訓練篇》", "en": "Demon Slayer: Hashira Training Arc", "ja": "鬼滅の刃 柱稽古編"},
+  "《赛博朋克：边缘行者》": {"zh-Hant": "《電馭叛客：邊緣行者》", "en": "Cyberpunk: Edgerunners", "ja": "サイバーパンク エッジランナーズ"},
+  "《蜡笔小新》": {"zh-Hant": "《蠟筆小新》", "en": "Crayon Shin-chan", "ja": "クレヨンしんちゃん"},
+  "《死神》": {"zh-Hant": "《死神 / BLEACH》", "en": "BLEACH", "ja": "BLEACH"},
+  "《排球少年！！》": {"zh-Hant": "《排球少年！！》", "en": "Haikyu!!", "ja": "ハイキュー!!"},
+  "《JOJO的奇妙冒险》": {"zh-Hant": "《JOJO的奇妙冒險》", "en": "JoJo's Bizarre Adventure", "ja": "ジョジョの奇妙な冒険"},
+  "《银魂》": {"zh-Hant": "《銀魂》", "en": "Gintama", "ja": "銀魂"},
+  "《全职猎人》": {"zh-Hant": "《HUNTER×HUNTER 獵人》", "en": "Hunter × Hunter", "ja": "HUNTER×HUNTER"},
+  "《数码宝贝》": {"zh-Hant": "《數碼寶貝》", "en": "Digimon", "ja": "デジモン"},
+  "《游戏王》": {"zh-Hant": "《遊戲王》", "en": "Yu-Gi-Oh!", "ja": "遊☆戯☆王"},
+  "《Fate/stay night》": {"zh-Hant": "《Fate/stay night》", "en": "Fate/stay night", "ja": "Fate/stay night"},
+  "《我推的孩子》": {"zh-Hant": "《我推的孩子》", "en": "Oshi no Ko", "ja": "【推しの子】"},
+  "《Love Live!》": {"zh-Hant": "《Love Live!》", "en": "Love Live!", "ja": "ラブライブ！"},
+  "《光之美少女》": {"zh-Hant": "《光之美少女》", "en": "Pretty Cure / Precure", "ja": "プリキュア"},
+  "《面包超人》": {"zh-Hant": "《麵包超人》", "en": "Anpanman", "ja": "アンパンマン"},
+  "《东京卍复仇者》": {"zh-Hant": "《東京卍復仇者》", "en": "Tokyo Revengers", "ja": "東京卍リベンジャーズ"},
+  "《犬夜叉》": {"zh-Hant": "《犬夜叉》", "en": "Inuyasha", "ja": "犬夜叉"},
+  "《夏目友人帐》": {"zh-Hant": "《夏目友人帳》", "en": "Natsume's Book of Friends", "ja": "夏目友人帳"},
+  "《黑子的篮球》": {"zh-Hant": "《黑子的籃球 / 影子籃球員》", "en": "Kuroko's Basketball", "ja": "黒子のバスケ"},
+  "《文豪野犬》": {"zh-Hant": "《文豪Stray Dogs / 文豪野犬》", "en": "Bungo Stray Dogs", "ja": "文豪ストレイドッグス"},
+  "《孤独摇滚！》": {"zh-Hant": "《孤獨搖滾！》", "en": "Bocchi the Rock!", "ja": "ぼっち・ざ・ろっく！"},
+  "《哪吒之魔童降世》": {"zh-Hant": "《哪吒之魔童降世》", "en": "Ne Zha", "ja": "ナタ～魔童降臨～"},
+  "《西游记之大圣归来》": {"zh-Hant": "《西遊記之大聖歸來》", "en": "Monkey King: Hero Is Back", "ja": "西遊記 ヒーロー・イズ・バック"},
+  "《白蛇：缘起》": {"zh-Hant": "《白蛇：緣起》", "en": "White Snake", "ja": "白蛇：縁起"},
+  "《长安三万里》": {"zh-Hant": "《長安三萬里》", "en": "Chang An", "ja": "長安三万里"},
+  "《深海》": {"zh-Hant": "《深海》", "en": "Deep Sea", "ja": "深海（Deep Sea）"},
+  "《刺客伍六七》": {"zh-Hant": "《刺客伍六七》", "en": "Scissor Seven", "ja": "シザー・セブン"},
+  "《罗小黑战记》": {"zh-Hant": "《羅小黑戰記》", "en": "The Legend of Hei", "ja": "羅小黒戦記"},
+  "《全职高手》": {"zh-Hant": "《全職高手》", "en": "The King's Avatar", "ja": "マスターオブスキル"},
+  "《一人之下》": {"zh-Hant": "《一人之下》", "en": "The Outcast", "ja": "一人之下 the outcast"},
+  "《狐妖小红娘》": {"zh-Hant": "《狐妖小紅娘》", "en": "Fox Spirit Matchmaker", "ja": "縁結びの妖狐ちゃん"},
+  "《灵笼》": {"zh-Hant": "《靈籠》", "en": "Ling Long: Incarnation", "ja": "霊籠（Incarnation）"},
+  "《暗喻幻想：ReFantazio》": {"zh-Hant": "《暗喻幻想：ReFantazio》", "en": "Metaphor: ReFantazio", "ja": "メタファー：リファンタジオ"},
+  "《最终幻想7重置版》": {"zh-Hant": "《最終幻想7重製版》", "en": "Final Fantasy VII Remake", "ja": "ファイナルファンタジーVII リメイク"},
+  "《歧路旅人》": {"zh-Hant": "《歧路旅人》", "en": "Octopath Traveler", "ja": "オクトパストラベラー"},
+  "《碧蓝幻想：Relink》": {"zh-Hant": "《碧藍幻想：Relink》", "en": "Granblue Fantasy: Relink", "ja": "グランブルーファンタジー リリンク"},
+  "《女神异闻录5皇家版》": {"zh-Hant": "《女神異聞錄5 皇家版》", "en": "Persona 5 Royal", "ja": "ペルソナ5 ザ・ロイヤル"},
+  "《莱莎的炼金工房》": {"zh-Hant": "《萊莎的鍊金工房》", "en": "Atelier Ryza", "ja": "ライザのアトリエ"},
+  "《真·女神转生5》": {"zh-Hant": "《真·女神轉生V》", "en": "Shin Megami Tensei V", "ja": "真・女神転生V"},
+  "《铁拳》": {"zh-Hant": "《鐵拳》", "en": "Tekken", "ja": "鉄拳"},
+  "《合金装备》": {"zh-Hant": "《潛龍諜影 / 合金裝備》", "en": "Metal Gear", "ja": "メタルギア"},
+  "《恶魔城》": {"zh-Hant": "《惡魔城》", "en": "Castlevania", "ja": "悪魔城ドラキュラ"},
+  "《洛克人》": {"zh-Hant": "《洛克人》", "en": "Mega Man / Rockman", "ja": "ロックマン"},
+  "《如龙》": {"zh-Hant": "《人中之龍》", "en": "Yakuza / Like a Dragon", "ja": "龍が如く"},
+  "《火焰之纹章》": {"zh-Hant": "《聖火降魔錄》", "en": "Fire Emblem", "ja": "ファイアーエムブレム"},
+  "《星之卡比》": {"zh-Hant": "《星之卡比》", "en": "Kirby", "ja": "星のカービィ"},
+  "《斯普拉遁》": {"zh-Hant": "《斯普拉遁》", "en": "Splatoon", "ja": "スプラトゥーン"},
+  "《任天堂明星大乱斗》": {"zh-Hant": "《任天堂明星大亂鬥》", "en": "Super Smash Bros.", "ja": "大乱闘スマッシュブラザーズ"},
+  "《尼尔》": {"zh-Hant": "《尼爾》", "en": "NieR", "ja": "ニーア"},
+  "《黑暗之魂》": {"zh-Hant": "《黑暗靈魂》", "en": "Dark Souls", "ja": "ダークソウル"},
+  "《战国无双》": {"zh-Hant": "《戰國無雙》", "en": "Samurai Warriors", "ja": "戦国無双"},
+  "《真·三国无双》": {"zh-Hant": "《真·三國無雙》", "en": "Dynasty Warriors", "ja": "真・三國無双"},
+  "《异度神剑》": {"zh-Hant": "《異度神劍》", "en": "Xenoblade Chronicles", "ja": "ゼノブレイド"},
+  "《死亡搁浅》": {"zh-Hant": "《死亡擱淺》", "en": "Death Stranding", "ja": "デス・ストランディング"},
+  "《Minecraft》": {"zh-Hant": "《Minecraft / 當個創世神》", "en": "Minecraft", "ja": "マインクラフト"},
+  "《Roblox》": {"zh-Hant": "《Roblox / 機器磚塊》", "en": "Roblox", "ja": "ロブロックス"},
+  "《Fortnite》": {"zh-Hant": "《Fortnite / 要塞英雄》", "en": "Fortnite", "ja": "フォートナイト"},
+  "《荒野大镖客》": {"zh-Hant": "《碧血狂殺》", "en": "Red Dead Redemption", "ja": "レッド・デッド・リデンプション"},
+  "《上古卷轴》": {"zh-Hant": "《上古卷軸》", "en": "The Elder Scrolls", "ja": "The Elder Scrolls"},
+  "《辐射》": {"zh-Hant": "《異塵餘生》", "en": "Fallout", "ja": "Fallout"},
+  "《光环》": {"zh-Hant": "《最後一戰》", "en": "Halo", "ja": "Halo"},
+  "《毁灭战士》": {"zh-Hant": "《毀滅戰士》", "en": "DOOM", "ja": "DOOM"},
+  "《魔兽争霸》": {"zh-Hant": "《魔獸爭霸》", "en": "Warcraft", "ja": "ウォークラフト"},
+  "《暗黑破坏神》": {"zh-Hant": "《暗黑破壞神》", "en": "Diablo", "ja": "ディアブロ"},
+  "《巫师》": {"zh-Hant": "《巫師》", "en": "The Witcher", "ja": "ウィッチャー"},
+  "《战神》": {"zh-Hant": "《戰神》", "en": "God of War", "ja": "ゴッド・オブ・ウォー"},
+  "《生化奇兵》": {"zh-Hant": "《生化奇兵》", "en": "BioShock", "ja": "バイオショック"},
+  "《文明》": {"zh-Hant": "《文明帝國》", "en": "Civilization", "ja": "シヴィライゼーション"},
+  "《星际争霸》": {"zh-Hant": "《星海爭霸》", "en": "StarCraft", "ja": "スタークラフト"},
+  "《半条命》": {"zh-Hant": "《戰慄時空》", "en": "Half-Life", "ja": "ハーフライフ"},
+  "《反恐精英》": {"zh-Hant": "《絕對武力 (CS)》", "en": "Counter-Strike", "ja": "カウンターストライク"},
+  "《地平线：零之曙光》": {"zh-Hant": "《地平線：期待黎明》", "en": "Horizon Zero Dawn", "ja": "ホライゾン ゼロ ドーン"},
+  "《诡秘之主》": {"zh-Hant": "《詭秘之主》", "en": "Lord of the Mysteries", "ja": "詭秘の主"},
+  "《盗墓笔记》": {"zh-Hant": "《盜墓筆記》", "en": "The Lost Tomb / Daomu Biji", "ja": "盗墓筆記（とうぼひっき）"},
+  "《鬼吹灯》": {"zh-Hant": "《鬼吹燈》", "en": "Ghost Blows Out the Light", "ja": "鬼吹灯（きすいとう）"},
+  "《三体》": {"zh-Hant": "《三體》", "en": "The Three-Body Problem", "ja": "三体"},
+  "《大奉打更人》": {"zh-Hant": "《大奉打更人》", "en": "Nightwatcher", "ja": "大奉打更人"},
+  "《将夜》": {"zh-Hant": "《將夜》", "en": "Ever Night", "ja": "将夜"},
+  "《雪中悍刀行》": {"zh-Hant": "《雪中悍刀行》", "en": "Sword Snow Stride", "ja": "雪中悍刀行"},
+  "《赘婿》": {"zh-Hant": "《贅婿》", "en": "My Heroic Husband", "ja": "贅婿"},
+  "《琅琊榜》": {"zh-Hant": "《琅琊榜》", "en": "Nirvana in Fire", "ja": "琅琊榜"},
+  "《后宫甄嬛传》": {"zh-Hant": "《後宮甄嬛傳》", "en": "Empresses in the Palace", "ja": "宮廷の諍い女"},
+  "《庆余年》": {"zh-Hant": "《慶餘年》", "en": "Joy of Life", "ja": "慶余年"},
+  "《仙逆》": {"zh-Hant": "《仙逆》", "en": "Renegade Immortal", "ja": "仙逆"},
+  "《凡人修仙传》": {"zh-Hant": "《凡人修仙傳》", "en": "A Record of a Mortal's Journey to Immortality", "ja": "凡人修仙伝"},
+  "《诛仙》": {"zh-Hant": "《誅仙》", "en": "Jade Dynasty", "ja": "誅仙"},
+  "《全职法师》": {"zh-Hant": "《全職法師》", "en": "Versatile Mage", "ja": "全職法師"},
+  "《节奏大师》": {"zh-Hant": "《節奏大師》", "en": "Rhythm Master", "ja": "リズムマスター"},
+  "《喵斯快跑》": {"zh-Hant": "《喵斯快跑》", "en": "Muse Dash", "ja": "Muse Dash"},
+  "《Phigros》": {"zh-Hant": "《Phigros》", "en": "Phigros", "ja": "Phigros"},
+  "《Cytus》": {"zh-Hant": "《Cytus》", "en": "Cytus", "ja": "Cytus"},
+  "《Deemo》": {"zh-Hant": "《Deemo》", "en": "Deemo", "ja": "Deemo"},
+  "《Arcaea》": {"zh-Hant": "《Arcaea》", "en": "Arcaea", "ja": "Arcaea"},
+  "《BanG Dream! 少女乐团派对！》": {"zh-Hant": "《BanG Dream! 少女樂團派對》", "en": "BanG Dream! Girls Band Party!", "ja": "バンドリ！ ガールズバンドパーティ！"},
+  "《世界计划 缤纷舞台！》": {"zh-Hant": "《世界計畫 繽紛舞台！》", "en": "HATSUNE MIKU: COLORFUL STAGE!", "ja": "プロジェクトセカイ カラフルステージ！"},
+  "《maimai》": {"zh-Hant": "《maimai》", "en": "maimai", "ja": "maimai"},
+  "《CHUNITHM》": {"zh-Hant": "《CHUNITHM》", "en": "CHUNITHM", "ja": "CHUNITHM (チュウニズム)"},
+  "《太鼓达人》": {"zh-Hant": "《太鼓之達人》", "en": "Taiko no Tatsujin", "ja": "太鼓の達人"},
+  "《Beat Saber》": {"zh-Hant": "《Beat Saber》", "en": "Beat Saber", "ja": "ビートセイバー"},
+  "《节奏天国》": {"zh-Hant": "《節奏天國》", "en": "Rhythm Heaven / Rhythm Tengoku", "ja": "リズム天国"},
+  "《戴森球计划》": {"zh-Hant": "《戴森球計劃》", "en": "Dyson Sphere Program", "ja": "ダイソンスフィアプログラム"},
+  "《鬼谷八荒》": {"zh-Hant": "《鬼谷八荒》", "en": "Tale of Immortal", "ja": "鬼谷八荒"},
+  "《中国式家长》": {"zh-Hant": "《中國式家長》", "en": "Chinese Parents", "ja": "中国式エリート悪徳官僚への道 (非官方)/ Chinese Parents"},
+  "《烟火》": {"zh-Hant": "《煙火》", "en": "Firework", "ja": "ファイヤーワーク"},
+  "《纸嫁衣》": {"zh-Hant": "《紙嫁衣》", "en": "Paper Bride", "ja": "紙装束"},
+  "《波西亚时光》": {"zh-Hant": "《波西亞時光》", "en": "My Time at Portia", "ja": "きみのまち ポルティア"},
+  "《沙石镇时光》": {"zh-Hant": "《沙石鎮時光》", "en": "My Time at Sandrock", "ja": "きみのまち サンドロック"},
+  "《MOLLY茉莉》": {"zh-Hant": "《MOLLY茉莉》", "en": "MOLLY", "ja": "MOLLY (モリー)"},
+  "《LABUBU拉布布》": {"zh-Hant": "《LABUBU拉布布》", "en": "LABUBU", "ja": "LABUBU (ラブブ)"},
+  "《SKULLPANDA熊喵》": {"zh-Hant": "《SKULLPANDA熊喵》", "en": "SKULLPANDA", "ja": "SKULLPANDA"},
+  "《DIMOO迪莫》": {"zh-Hant": "《DIMOO迪莫》", "en": "DIMOO", "ja": "DIMOO (ディムー)"},
+  "《CRYBABY哭娃》": {"zh-Hant": "《CRYBABY哭娃》", "en": "CRYBABY", "ja": "CRYBABY"},
+  "《Hello Kitty》": {"zh-Hant": "《Hello Kitty / 凱蒂貓》", "en": "Hello Kitty", "ja": "ハローキティ"},
+  "《布丁狗》": {"zh-Hant": "《布丁狗》", "en": "Pompompurin", "ja": "ポムポムプリン"},
+  "《酷企鹅》": {"zh-Hant": "《酷企鵝》", "en": "Badtz-Maru", "ja": "バッドばつ丸"},
+
+};
+
+const zhPhraseMap = {
+  "手游": "手遊",
+  "游戏": "遊戲",
+  "动画": "動畫",
+  "漫画": "漫畫",
+  "网文": "網文",
+  "欧美": "歐美",
+  "国产": "中國",
+  "改编": "改編",
+  "星穹铁道": "星穹鐵道",
+  "绝区零": "絕區零",
+  "崩坏": "崩壞",
+  "少女前线": "少女前線"
+};
+
+const zhCharMap = {
+  国: "國", 产: "產", 动: "動", 画: "畫", 戏: "戲", 游: "遊", 编: "編", 网: "網", 欧: "歐",
+  节: "節", 酱: "醬", 铁: "鐵", 绝: "絕", 终: "終", 恋: "戀", 战: "戰", 鸣: "鳴",
+  无: "無", 闪: "閃", 蓝: "藍", 档: "檔", 线: "線", 阴: "陰", 阳: "陽", 师: "師",
+  苍: "蒼", 过: "過", 发: "發", 现: "現", 华: "華", 龙: "龍", 门: "門", 风: "風",
+  云: "雲", 剑: "劍", 侠: "俠", 猫: "貓", 马: "馬", 药: "藥", 独: "獨", 语: "語",
+  执: "執", 绿: "綠", 缝: "縫", 间: "間", 谍: "諜", 进: "進", 击: "擊", 术: "術",
+  贼: "賊", 级: "級", 灭: "滅", 训: "訓", 练: "練", 边: "邊", 电: "電", 锯: "鋸",
+  钢: "鋼", 炼: "鍊", 宝: "寶", 贝: "貝", 骑: "騎", 团: "團", 连: "連", 缤: "繽",
+  场: "場", 职: "職", 暗: "暗", 复: "復", 斗: "鬥", 恶: "惡", 萨: "薩", 达: "達",
+  盗: "盜", 猎: "獵", 车: "車", 辐: "輻", 毁: "毀", 兽: "獸", 锋: "鋒", 条: "條",
+  岛: "島", 远: "遠", 丽: "麗", 还: "還", 质: "質", 应: "應", 纪: "紀", 时: "時",
+  记: "記", 体: "體", 开: "開", 盘: "盤", 飞: "飛", 问: "問", 尘: "塵", 劲: "勁",
+  乐: "樂", 计: "計", 书: "書", 凉: "涼", 灵: "靈", 笼: "籠", 赐: "賜", 义: "義",
+  礼: "禮", 叶: "葉", 万: "萬", 与: "與", 这: "這", 后: "後", 习: "習", 气: "氣"
+};
+
+function toTraditionalLabel(value) {
+  let output = String(value || "");
+  Object.keys(zhPhraseMap).forEach((key) => {
+    output = output.replaceAll(key, zhPhraseMap[key]);
+  });
+  return Array.from(output).map((char) => zhCharMap[char] || char).join("");
+}
+
+function localizeTagLabel(label) {
+  const raw = String(label || "");
+  const locale = currentLocale();
+  const mapped = titleLocaleMap[raw] && titleLocaleMap[raw][locale];
+  if (mapped) return mapped;
+  if (locale !== "zh-Hant" && titleLocaleMap[raw] && titleLocaleMap[raw]["zh-Hant"]) return titleLocaleMap[raw]["zh-Hant"];
+  return toTraditionalLabel(raw);
+}
+
+function localizeTagCategories(categories) {
+  const locale = currentLocale();
+  return (Array.isArray(categories) ? categories : []).map((category) => {
+    const name = category && category.name ? String(category.name) : "";
+    const localizedName = categoryLocaleMap[name]?.[locale] || categoryLocaleMap[name]?.["zh-Hant"] || toTraditionalLabel(name);
+    return {
+      ...category,
+      originalName: name,
+      name: localizedName,
+      tags: (category.tags || []).map((tag) => {
+        if (!tag) return "";
+        if (typeof tag === "string") return localizeTagLabel(tag);
+        const tagName = tag.name || tag.label || tag.title || "";
+        const localizedTag = localizeTagLabel(tagName);
+        return { ...tag, originalName: tagName, name: localizedTag, label: localizedTag, title: localizedTag };
+      })
+    };
+  });
+}
+
+const routes = [
+  ["devices", "navDevices", renderDevices],
+  ["detail", "navDetail", renderDetail],
+  ["card", "navCard", renderCard],
+  ["media", "navMedia", renderMedia],
+  ["tags", "navTags", renderTags],
+  ["settings", "navSettings", renderDeviceSettings],
+  ["received", "navReceived", renderReceivedCards],
+  ["firmware", "navFirmware", renderFirmware],
+  ["appsettings", "navAppSettings", renderAppSettings]
+];
+
+const initialState = () => ({
+  currentRoute: "devices",
+  currentDeviceId: "",
+  devices: [],
+  pendingDevice: null,
+  receivedCardsByDevice: {},
+  deviceSettings: {
+    disableLight: false,
+    disableBuzzer: false,
+    disableVibration: false,
+    disableBroadcast: false,
+    disableInterestSensing: false,
+    disableAmbienceLight: false,
+    controlInfoBytes: [1, 1, 1, 1, 1, 0, 0, 1]
+  },
+  appSettings: { transferChunkDelay: 8 },
+  firmwareBusy: false,
+  localeMode: localStorage.getItem(LOCALE_STORAGE_KEY) || "auto",
+  locale: detectLocale(),
+  tagCategories: []
+});
+
+let state = loadState();
+let activeTransferAbort = false;
+let toastTimer = null;
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function loadState() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    return { ...initialState(), ...(cached || {}), firmwareBusy: false };
+  } catch {
+    return initialState();
+  }
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function setState(patch) {
+  state = { ...state, ...patch };
+  saveState();
+  render();
+}
+
+function toast(message) {
+  const el = $("#toast");
+  el.textContent = message;
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("show"), String(message || "").length > 80 ? 8000 : 2600);
+}
+
+function setBanner(message = "") {
+  banner.textContent = message;
+  banner.classList.toggle("show", Boolean(message));
+}
+
+function formatError(error, fallback = t("saveFailed")) {
+  const message = String(error && (error.message || error.name) || fallback);
+  if (/User cancelled|cancelled|canceled|NotFoundError/i.test(message)) return t("errorCanceled");
+  if (/GATT|Bluetooth|NetworkError|disconnected/i.test(message)) return t("errorBluetooth", { fallback });
+  if (/timeout|超时/i.test(message)) return t("errorTimeout", { fallback });
+  return t("errorGeneric", { fallback, message: localizeKnownErrorMessage(message) });
+}
+
+function localizeKnownErrorMessage(message) {
+  if (/請先連接設備|请先连接设备|藍牙未連接|蓝牙未连接|no connection|not connected/i.test(message)) return t("errorNoConnection");
+  if (/Firmware|Device returned error|update|OTA|damaged|incompatible|does not match|empty/i.test(message)) return t("errorFirmwareFile");
+  if (/Unsupported media type/i.test(message)) return t("errorUnsupportedMedia");
+  if (/GIF|Not a valid GIF|GIF file|GIF data|LZW|color table/i.test(message)) return t("errorInvalidGif");
+  if (/Canvas export failed|No frames to encode|video|media/i.test(message)) return t("errorMediaEncode");
+  return message;
+}
+
+function getCurrentDevice() {
+  return state.devices.find((item) => item.id === state.currentDeviceId || item.sn === state.currentDeviceId) || state.devices[0] || null;
+}
+
+function upsertDevice(device) {
+  const normalized = {
+    id: device.sn || device.id || `web-${Date.now()}`,
+    sn: device.sn || device.id || "",
+    mac: device.mac || "",
+    name: device.name || "MoniCard",
+    battery: device.battery ?? "--",
+    usedStorageLabel: device.usedStorageLabel || "--",
+    totalStorageLabel: device.totalStorageLabel || "--",
+    storagePercent: Number(device.storagePercent) || 0,
+    statusLabel: device.statusLabel || t("online"),
+    signalStrength: device.signalStrength || 0,
+    connected: Boolean(device.connected),
+    firmwareVersion: device.firmwareVersion || "--",
+    latestFirmwareVersion: device.latestFirmwareVersion || "--",
+    cardPreview: device.cardPreview || "",
+    tagCategory: device.tagCategory || "",
+    tagName: device.tagName || "",
+    carouselDuration: device.carouselDuration || 0,
+    bleDeviceId: device.bleDeviceId || ""
+  };
+  const index = state.devices.findIndex((item) => item.id === normalized.id || item.sn === normalized.sn);
+  if (index >= 0) state.devices[index] = { ...state.devices[index], ...normalized };
+  else state.devices.unshift(normalized);
+  state.currentDeviceId = normalized.id;
+  saveState();
+  return normalized;
+}
+
+function updateDevice(id, patch) {
+  state.devices = state.devices.map((item) => item.id === id || item.sn === id ? { ...item, ...patch } : item);
+  saveState();
+}
+
+function bytesToHex(bytes) {
+  return Array.from(bytes || []).map((byte) => byte.toString(16).padStart(2, "0")).join(" ");
+}
+
+function readUint16(bytes, offset) {
+  return (bytes[offset] | (bytes[offset + 1] << 8)) >>> 0;
+}
+
+function readUint32(bytes, offset) {
+  return (bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16) | (bytes[offset + 3] << 24)) >>> 0;
+}
+
+function pushUint16(out, value) {
+  out.push(value & 255, (value >> 8) & 255);
+}
+
+function pushUint32(out, value) {
+  out.push(value & 255, (value >>> 8) & 255, (value >>> 16) & 255, (value >>> 24) & 255);
+}
+
+function concatBytes(parts) {
+  const total = parts.reduce((sum, part) => sum + part.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  parts.forEach((part) => {
+    out.set(part, offset);
+    offset += part.length;
+  });
+  return out;
+}
+
+function asciiBytes(text) {
+  return new Uint8Array(Array.from(String(text || "")).map((char) => char.charCodeAt(0) & 255));
+}
+
+function utf8Bytes(text) {
+  return encoder.encode(String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n"));
+}
+
+function trimZeros(bytes) {
+  let end = bytes.length;
+  while (end > 0 && bytes[end - 1] === 0) end -= 1;
+  return bytes.slice(0, end);
+}
+
+function textFromBytes(bytes) {
+  return decoder.decode(trimZeros(bytes || new Uint8Array())).replace(/\u0000/g, "").trim();
+}
+
+function encodeFrame(category, payload) {
+  const head = [category, 0];
+  pushUint16(head, payload.length);
+  return concatBytes([new Uint8Array(head), payload]);
+}
+
+function encodeLengthPrefixedMessage(category, command, payload = new Uint8Array()) {
+  const head = [];
+  pushUint16(head, command);
+  pushUint16(head, payload.length);
+  return encodeFrame(category, concatBytes([new Uint8Array(head), payload]));
+}
+
+function encodeControl(command, payload = new Uint8Array()) {
+  const head = [];
+  pushUint16(head, command);
+  return encodeFrame(CATEGORY.CONTROL, concatBytes([new Uint8Array(head), payload]));
+}
+
+function encodeReadCardInfo() {
+  return encodeControl(CONTROL_COMMAND.READ_CARD_INFO, new Uint8Array([1]));
+}
+
+function encodeSetCardInfo(text) {
+  const payload = utf8Bytes(text);
+  if (payload.length > CARD_INFO_MAX_BYTES) throw new Error(`名片内容超过 ${CARD_INFO_MAX_BYTES} 字节限制`);
+  return encodeControl(CONTROL_COMMAND.SET_CARD_INFO, payload);
+}
+
+function encodeGetSerialNumber() {
+  return encodeControl(CONTROL_COMMAND.GET_SERIAL_NUMBER, new Uint8Array([1, 0]));
+}
+
+function encodeGetVersion() {
+  return encodeControl(CONTROL_COMMAND.GET_VERSION, new Uint8Array([1, 0]));
+}
+
+function encodeGetBattery() {
+  return encodeControl(CONTROL_COMMAND.GET_BATTERY, new Uint8Array([1, 0]));
+}
+
+function encodeGetFileSystemInfo() {
+  return encodeControl(CONTROL_COMMAND.GET_FS_INFO, new Uint8Array([1]));
+}
+
+function encodeReadControlInfo() {
+  return encodeControl(CONTROL_COMMAND.CONTROL_INFO, new Uint8Array([1]));
+}
+
+function encodeWriteControlInfo(bytes) {
+  if (!bytes || bytes.length !== CONTROL_INFO_BYTES) throw new Error("控制資訊必須為 8 位元組");
+  return encodeControl(CONTROL_COMMAND.CONTROL_INFO, concatBytes([new Uint8Array([2]), new Uint8Array(bytes)]));
+}
+
+function encodeSetTags(tags) {
+  const list = Array.isArray(tags) ? tags : [];
+  if (list.length > TAGS_MAX_COUNT) throw new Error(`標籤最多設定 ${TAGS_MAX_COUNT} 個`);
+  const payload = [list.length & 255];
+  list.forEach((tag) => {
+    payload.push(Number(tag.category || tag.categoryId) & 255);
+    pushUint16(payload, Number(tag.tagId || tag.id) || 0);
+  });
+  return encodeControl(CONTROL_COMMAND.SET_TAGS, new Uint8Array(payload));
+}
+
+function encodeReadCardsCount() {
+  return encodeControl(CONTROL_COMMAND.READ_CARDS_COUNT, new Uint8Array([1]));
+}
+
+function encodeReadCardById(id) {
+  return encodeControl(CONTROL_COMMAND.READ_CARD_BY_ID, new Uint8Array([1, id & 255]));
+}
+
+function encodeDeleteCard(id) {
+  return encodeControl(CONTROL_COMMAND.DELETE_CARD, new Uint8Array([2, id & 255]));
+}
+
+function encodeSetCarousel(seconds) {
+  const value = Math.max(0, Math.min(Number(seconds) || 0, 3600));
+  return encodeControl(CONTROL_COMMAND.SET_CAROUSEL, new Uint8Array([value & 255, (value >> 8) & 255]));
+}
+
+function encodeReadCarousel() {
+  return encodeControl(CONTROL_COMMAND.READ_CAROUSEL, new Uint8Array([1]));
+}
+
+function encodeFileTransferStart(size, fileType) {
+  const payload = [];
+  pushUint16(payload, fileType);
+  payload.push(2);
+  pushUint32(payload, size);
+  return encodeLengthPrefixedMessage(CATEGORY.FILE, FILE_COMMAND.START_REQUEST, new Uint8Array(payload));
+}
+
+function encodeFileInfoRequest(blockCount) {
+  const payload = [];
+  pushUint32(payload, blockCount);
+  return encodeLengthPrefixedMessage(CATEGORY.FILE, FILE_COMMAND.FILE_INFO_REQUEST, new Uint8Array(payload));
+}
+
+function encodeFileSendStart(size, name) {
+  const nameBytes = asciiBytes(name);
+  const payload = [];
+  pushUint32(payload, size);
+  pushUint16(payload, nameBytes.length);
+  return encodeLengthPrefixedMessage(CATEGORY.FILE, FILE_COMMAND.FILE_SEND_START_REQUEST, concatBytes([new Uint8Array(payload), nameBytes]));
+}
+
+function encodeFileSendData(index, bytes) {
+  const payload = [];
+  pushUint32(payload, index);
+  return encodeLengthPrefixedMessage(CATEGORY.FILE, FILE_COMMAND.FILE_SEND_DATA_REQUEST, concatBytes([new Uint8Array(payload), bytes]));
+}
+
+function encodeFileSendEnd() {
+  return encodeLengthPrefixedMessage(CATEGORY.FILE, FILE_COMMAND.FILE_SEND_END_REQUEST, new Uint8Array([0, 0]));
+}
+
+function encodeFileTransferEnd() {
+  return encodeLengthPrefixedMessage(CATEGORY.FILE, FILE_COMMAND.END_REQUEST, new Uint8Array());
+}
+
+function fileTransferBytes(bytes) {
+  const alignedLength = (bytes.length + 3) & -4;
+  const aligned = new Uint8Array(alignedLength);
+  aligned.set(bytes);
+  const crc = crc32Mpeg2(aligned);
+  const out = new Uint8Array(alignedLength + 4);
+  out.set(aligned);
+  out[alignedLength] = crc & 255;
+  out[alignedLength + 1] = (crc >>> 8) & 255;
+  out[alignedLength + 2] = (crc >>> 16) & 255;
+  out[alignedLength + 3] = (crc >>> 24) & 255;
+  return { bytes: out, alignedLength, totalLength: out.length, crc };
+}
+
+function filePacketSize(mtu = 247) {
+  const value = Number(mtu) || 247;
+  const byMtu = Math.max(256, 50 * Math.max(value - 7, 1) - 8);
+  return Math.max(256, Math.min(10240, byMtu));
+}
+
+function crc32Mpeg2(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte << 24;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc & 0x80000000) ? ((crc << 1) ^ 0x04c11db7) >>> 0 : (crc << 1) >>> 0;
+    }
+  }
+  return crc >>> 0;
+}
+
+function encodeOta(command, payload = new Uint8Array()) {
+  const head = [];
+  pushUint16(head, command);
+  pushUint16(head, payload.length);
+  return encodeFrame(CATEGORY.OTA, concatBytes([new Uint8Array(head), payload]));
+}
+
+function encodeOtaPackageStart(totalBytes, packetCount, crc) {
+  const payload = [];
+  pushUint32(payload, totalBytes);
+  pushUint32(payload, packetCount);
+  pushUint32(payload, crc);
+  payload.push(2, 0, 0, 0);
+  return encodeOta(SIFLI_OTA_COMMAND.IMAGE_PACKAGE_START_REQUEST, new Uint8Array(payload));
+}
+
+function encodeOtaPackagePacket(index, bytes, crc) {
+  const payload = [];
+  pushUint32(payload, index);
+  pushUint32(payload, bytes.length);
+  pushUint32(payload, crc);
+  return encodeOta(SIFLI_OTA_COMMAND.IMAGE_PACKAGE_PACKET_REQUEST, concatBytes([new Uint8Array(payload), bytes]));
+}
+
+function encodeOtaPackageEnd() {
+  return encodeOta(SIFLI_OTA_COMMAND.IMAGE_PACKAGE_END_REQUEST, new Uint8Array([0, 0]));
+}
+
+function otaPayload(message) {
+  if (!message?.data || message.data.length < 2) return new Uint8Array();
+  const length = readUint16(message.data, 0);
+  return message.data.slice(2, 2 + length);
+}
+
+function otaErrorMessage(code) {
+  const map = {
+    3: "Storage is full",
+    5: "Firmware does not match this device",
+    6: "Firmware version is incompatible",
+    7: "Firmware version is incompatible",
+    8: "Firmware file is damaged",
+    9: "Firmware file is damaged",
+    10: "Device is already updating",
+    13: "Transfer was interrupted"
+  };
+  return map[code] || `Device returned error ${code}`;
+}
+
+function parseOtaPackageStart(message) {
+  const payload = otaPayload(message);
+  const resultCode = payload.length >= 2 ? readUint16(payload, 0) : -1;
+  if (resultCode !== 0) throw new Error(otaErrorMessage(resultCode));
+  return {
+    responseFrequency: payload.length >= 3 ? payload[2] : 1,
+    completedCount: payload.length >= 8 ? readUint32(payload, 4) : 0
+  };
+}
+
+function parseOtaPackagePacket(message, expectedIndex) {
+  const payload = otaPayload(message);
+  const resultCode = payload.length >= 2 ? readUint16(payload, 0) : -1;
+  const retransmission = payload.length >= 3 ? payload[2] : 0;
+  const completedCount = payload.length >= 8 ? readUint32(payload, 4) : 0;
+  if (resultCode !== 0) throw new Error(retransmission ? `${otaErrorMessage(resultCode)}. Please restart the update.` : otaErrorMessage(resultCode));
+  if (completedCount && completedCount < expectedIndex) throw new Error("Device update progress is inconsistent. Please restart the update.");
+  return { resultCode, retransmission, completedCount };
+}
+
+function parseOtaPackageEnd(message) {
+  const payload = otaPayload(message);
+  const resultCode = payload.length >= 2 ? readUint16(payload, 0) : -1;
+  if (resultCode !== 0) throw new Error(otaErrorMessage(resultCode));
+  return resultCode;
+}
+
+function splitFrame(frame, mtu = 247) {
+  const limit = Math.max(20, mtu - 7);
+  if (frame.length <= limit) {
+    const head = [frame[0], 0];
+    pushUint16(head, frame.length - 4);
+    return [concatBytes([new Uint8Array(head), frame.slice(4)])];
+  }
+  const chunks = [];
+  for (let offset = 0; offset < frame.length - 4;) {
+    const remaining = frame.length - 4 - offset;
+    const size = Math.min(limit, remaining);
+    if (offset === 0) {
+      const head = [frame[0], 1];
+      pushUint16(head, frame.length - 4);
+      chunks.push(concatBytes([new Uint8Array(head), frame.slice(4, 4 + size)]));
+    } else {
+      chunks.push(concatBytes([new Uint8Array([frame[0], remaining > limit ? 2 : 3]), frame.slice(4 + offset, 4 + offset + size)]));
+    }
+    offset += size;
+  }
+  return chunks;
+}
+
+function parseNotification(raw, fragmentState) {
+  const bytes = raw instanceof Uint8Array ? raw : new Uint8Array(raw);
+  if (!bytes.length) return null;
+  const type = bytes[1];
+  if (type === 0) {
+    const length = readUint16(bytes, 2);
+    return bytes.slice(0, 4 + length);
+  }
+  if (type === 1) {
+    fragmentState.value = { category: bytes[0], length: readUint16(bytes, 2), chunks: [bytes.slice(4)] };
+    return null;
+  }
+  if (!fragmentState.value) return null;
+  fragmentState.value.chunks.push(bytes.slice(2));
+  if (type !== 3) return null;
+  const payload = concatBytes(fragmentState.value.chunks).slice(0, fragmentState.value.length);
+  const frame = new Uint8Array(4 + fragmentState.value.length);
+  frame[0] = fragmentState.value.category;
+  frame[1] = 0;
+  frame[2] = fragmentState.value.length & 255;
+  frame[3] = (fragmentState.value.length >> 8) & 255;
+  frame.set(payload, 4);
+  fragmentState.value = null;
+  return frame;
+}
+
+function parseMessage(frame) {
+  if (!frame || frame.length < 6) return null;
+  const category = frame[0];
+  const length = readUint16(frame, 2);
+  const payload = frame.slice(4, 4 + length);
+  const command = readUint16(payload, 0);
+  return { category, command, data: payload.slice(2) };
+}
+
+function statusFromResponse(message) {
+  return !message || message.data.length < 2 ? 0 : readUint16(message.data, 0);
+}
+
+function ensureFileOk(message, fallback) {
+  const status = statusFromResponse(message);
+  if (status === 0) return message;
+  const messages = {
+    1: "設備儲存空間不足，請刪除部分素材後重試",
+    2: "檔案類型不被設備支援",
+    3: "檔案大小超出設備限制",
+    4: "檔案名稱格式不正確",
+    5: "傳輸校驗失敗，請重試"
+  };
+  throw new Error(messages[status] || `${fallback || "檔案傳輸失敗"}(${status})`);
+}
+
+class MoniCardWebBluetooth {
+  constructor() {
+    this.device = null;
+    this.server = null;
+    this.characteristic = null;
+    this.mtu = 247;
+    this.pending = [];
+    this.fragmentState = { value: null };
+    this.connection = null;
+  }
+
+  isSupported() {
+    return Boolean(navigator.bluetooth && window.isSecureContext);
+  }
+
+  async requestAndConnect() {
+    if (!this.isSupported()) throw new Error("目前瀏覽器或頁面環境不支援 Web Bluetooth");
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: "MoniCard" }, ...SERVICE_UUIDS.map((service) => ({ services: [service] }))],
+      optionalServices: SERVICE_UUIDS
+    });
+    return this.connectDevice(device);
+  }
+
+  async connectDevice(device) {
+    this.device = device;
+    this.device.addEventListener("gattserverdisconnected", () => this.handleDisconnected());
+    this.server = await device.gatt.connect();
+    const service = await this.getMoniCardService();
+    this.characteristic = await this.getMoniCardCharacteristic(service);
+    await this.characteristic.startNotifications();
+    this.characteristic.addEventListener("characteristicvaluechanged", (event) => this.handleNotification(event));
+    this.connection = { bleDeviceId: device.id, name: device.name || "MoniCard" };
+    return this.connection;
+  }
+
+  async getMoniCardService() {
+    let lastError = null;
+    for (const uuid of SERVICE_UUIDS) {
+      try {
+        return await this.server.getPrimaryService(uuid);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    const accessible = await this.listAccessibleServices();
+    const error = new Error(`MoniCard service not found. Tried: ${SERVICE_UUIDS.join(", ")}. Accessible services: ${accessible.join(", ") || "none"}`);
+    error.cause = lastError;
+    throw error;
+  }
+
+  async getMoniCardCharacteristic(service) {
+    let lastError = null;
+    for (const uuid of DATA_CHARACTERISTIC_UUIDS) {
+      try {
+        return await service.getCharacteristic(uuid);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    const accessible = await this.listAccessibleCharacteristics(service);
+    const error = new Error(`MoniCard data characteristic not found. Tried: ${DATA_CHARACTERISTIC_UUIDS.join(", ")}. Accessible characteristics: ${accessible.join(", ") || "none"}`);
+    error.cause = lastError;
+    throw error;
+  }
+
+  async listAccessibleServices() {
+    try {
+      const services = await this.server.getPrimaryServices();
+      return services.map((service) => service.uuid);
+    } catch {
+      return [];
+    }
+  }
+
+  async listAccessibleCharacteristics(service) {
+    try {
+      const characteristics = await service.getCharacteristics();
+      return characteristics.map((characteristic) => characteristic.uuid);
+    } catch {
+      return [];
+    }
+  }
+
+  async connectGranted(savedDevice = {}) {
+    if (!navigator.bluetooth?.getDevices) throw new Error("此瀏覽器不支援讀取已授權設備");
+    const devices = await navigator.bluetooth.getDevices();
+    const target = devices.find((device) => {
+      return device.id === savedDevice.bleDeviceId || device.name === savedDevice.name || /monicard/i.test(device.name || "");
+    });
+    if (!target) throw new Error("沒有找到已授權的 MoniCard，請重新點擊連接設備");
+    return this.connectDevice(target);
+  }
+
+  async disconnect() {
+    this.pending.splice(0).forEach((item) => {
+      clearTimeout(item.timer);
+      item.reject(new Error("藍牙連線已關閉"));
+    });
+    if (this.device && this.device.gatt.connected) this.device.gatt.disconnect();
+    this.device = null;
+    this.server = null;
+    this.characteristic = null;
+    this.connection = null;
+  }
+
+  handleDisconnected() {
+    const current = getCurrentDevice();
+    if (current) updateDevice(current.id, { connected: false, statusLabel: t("deviceDisconnected") });
+    this.connection = null;
+    this.pending.splice(0).forEach((item) => item.reject(new Error("藍牙連線已斷開")));
+      toast(t("deviceDisconnected"));
+    render();
+  }
+
+  handleNotification(event) {
+    const frame = parseNotification(new Uint8Array(event.target.value.buffer), this.fragmentState);
+    const message = parseMessage(frame);
+    if (!message) return;
+    const index = this.pending.findIndex((item) => item.command === message.command && item.category === message.category);
+    if (index >= 0) {
+      const item = this.pending.splice(index, 1)[0];
+      clearTimeout(item.timer);
+      item.resolve(message);
+    }
+  }
+
+  async writeFrame(frame) {
+    if (!this.characteristic) throw new Error("藍牙未連接");
+    const chunks = splitFrame(frame, this.mtu);
+    for (const chunk of chunks) {
+      if (this.characteristic.writeValueWithoutResponse) await this.characteristic.writeValueWithoutResponse(chunk);
+      else await this.characteristic.writeValue(chunk);
+      await sleep(4);
+    }
+  }
+
+  async request(frame, category, command, timeout = 5000) {
+    const response = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pending = this.pending.filter((item) => item.timer !== timer);
+        reject(new Error("設備回應逾時"));
+      }, timeout);
+      this.pending.push({ category, command, resolve, reject, timer });
+    });
+    try {
+      await this.writeFrame(frame);
+    } catch (error) {
+      this.pending = this.pending.filter((item) => item.command !== command || item.category !== category);
+      throw error;
+    }
+    return response;
+  }
+
+  async control(frame, command, timeout = 5000) {
+    return this.request(frame, CATEGORY.CONTROL, command, timeout);
+  }
+
+  async file(frame, command, timeout = 10000) {
+    return this.request(frame, CATEGORY.FILE, command, timeout);
+  }
+
+  async ota(frame, command, timeout = 60000) {
+    return this.request(frame, CATEGORY.OTA, command, timeout);
+  }
+
+  async readSummary(device = {}) {
+    await this.ensureConnected();
+    const sn = textFromBytes((await this.control(encodeGetSerialNumber(), CONTROL_COMMAND.GET_SERIAL_NUMBER + 1)).data);
+    const batteryMessage = await this.control(encodeGetBattery(), CONTROL_COMMAND.GET_BATTERY + 1).catch(() => null);
+    const versionMessage = await this.control(encodeGetVersion(), CONTROL_COMMAND.GET_VERSION + 1).catch(() => null);
+    const fsMessage = await this.control(encodeGetFileSystemInfo(), CONTROL_COMMAND.GET_FS_INFO_RESPONSE).catch(() => null);
+    const fs = parseFsInfo(fsMessage);
+    const summary = {
+      id: sn || device.id || this.device.id,
+      sn: sn || "",
+      bleDeviceId: this.device.id,
+      name: device.name || this.device.name || "MoniCard",
+      connected: true,
+      statusLabel: t("online"),
+      battery: batteryMessage && batteryMessage.data.length >= 2 ? readUint16(batteryMessage.data, 0) : "--",
+      firmwareVersion: versionMessage ? textFromBytes(versionMessage.data) || "--" : "--",
+      ...formatFsInfo(fs)
+    };
+    this.connection = { ...this.connection, ...summary };
+    return summary;
+  }
+
+  async ensureConnected() {
+    if (!this.device || !this.device.gatt.connected) throw new Error("請先連接設備");
+    return this.connection;
+  }
+
+  async readCardInfo() {
+    await this.ensureConnected();
+    const message = await this.control(encodeReadCardInfo(), CONTROL_COMMAND.RESP_READ_CARD, 1500);
+    return textFromBytes(message.data);
+  }
+
+  async writeCardInfo(text) {
+    await this.ensureConnected();
+    const message = await this.control(encodeSetCardInfo(text), CONTROL_COMMAND.RESP_CARD_INFO, 2500);
+    const status = statusFromResponse(message);
+    if (status !== 0) throw new Error(`名片寫入失敗(${status})`);
+    return { cardInfo: text, byteLength: utf8Bytes(text).length };
+  }
+
+  async readControlSettings() {
+    await this.ensureConnected();
+    const message = await this.control(encodeReadControlInfo(), CONTROL_COMMAND.CONTROL_INFO_RESPONSE, 5000);
+    if (!message.data || message.data.length < CONTROL_INFO_BYTES) throw new Error("設備控制資訊回應異常");
+    return settingsFromControlBytes(message.data.slice(0, CONTROL_INFO_BYTES));
+  }
+
+  async writeControlSettings(settings) {
+    await this.ensureConnected();
+    const normalized = normalizeSettings(settings);
+    const message = await this.control(encodeWriteControlInfo(normalized.controlInfoBytes), CONTROL_COMMAND.CONTROL_INFO_RESPONSE, 5000);
+    const status = statusFromResponse(message);
+    if (status !== 0) throw new Error(`寫入設備設定失敗(${status})`);
+    return normalized;
+  }
+
+  async readCarousel() {
+    await this.ensureConnected();
+    const message = await this.control(encodeReadCarousel(), CONTROL_COMMAND.RESP_CAROUSEL_RD, 5000);
+    return message.data.length >= 2 ? readUint16(message.data, 0) : 0;
+  }
+
+  async writeCarousel(seconds) {
+    await this.ensureConnected();
+    const message = await this.control(encodeSetCarousel(seconds), CONTROL_COMMAND.RESP_CAROUSEL, 5000);
+    const status = statusFromResponse(message);
+    if (status !== 0) throw new Error("設定輪播間隔失敗");
+    return seconds;
+  }
+
+  async writeTags(tags) {
+    await this.ensureConnected();
+    const message = await this.control(encodeSetTags(tags), CONTROL_COMMAND.RESP_TAGS, 5000);
+    const status = statusFromResponse(message);
+    if (status !== 0) throw new Error(`寫入標籤失敗(${status})`);
+    return tags;
+  }
+
+  async syncReceivedCards(onProgress) {
+    await this.ensureConnected();
+    const countMessage = await this.control(encodeReadCardsCount(), CONTROL_COMMAND.RESP_CARDS_COUNT, 1500);
+    const count = countMessage.data.length >= 2 ? readUint16(countMessage.data, 0) : 0;
+    const cards = [];
+    for (let id = count - 1; id >= 1; id -= 1) {
+      onProgress?.(t("syncingCard", { index: count - id, total: Math.max(count - 1, 0) }));
+      const message = await this.control(encodeReadCardById(id), CONTROL_COMMAND.RESP_CARD_BY_ID, 2000);
+      const card = parseReceivedCard(message.data);
+      if (card) cards.push(card);
+    }
+    return { totalCount: count, cards };
+  }
+
+  async deleteReceivedCard(id) {
+    await this.ensureConnected();
+    const message = await this.control(encodeDeleteCard(id), CONTROL_COMMAND.RESP_DELETE_CARD, 1500);
+    const status = statusFromResponse(message);
+    if (status !== 0) throw new Error(`刪除名片失敗(${status})`);
+  }
+
+  async transferFile(file, type, onProgress) {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    return this.transferBytes(bytes, safeFileName(file.name), type, onProgress);
+  }
+
+  async transferBytes(bytes, fileName, type, onProgress) {
+    await this.ensureConnected();
+    activeTransferAbort = false;
+    const prepared = fileTransferBytes(bytes);
+    const safeName = safeFileName(fileName);
+    const fsMessage = await this.control(encodeGetFileSystemInfo(), CONTROL_COMMAND.GET_FS_INFO_RESPONSE, 5000).catch(() => null);
+    const fs = parseFsInfo(fsMessage);
+    if (fs && Number.isFinite(fs.freeBytes)) {
+      const needed = prepared.totalLength + FILE_TRANSFER_FREE_MARGIN_BYTES;
+      if (needed > fs.freeBytes) {
+        const error = new Error(t("storageInsufficient", { needed: formatBytes(needed), free: formatBytes(fs.freeBytes) }));
+        error.code = "STORAGE_INSUFFICIENT";
+        throw error;
+      }
+    }
+    const start = await this.file(encodeFileTransferStart(prepared.totalLength, type), FILE_COMMAND.START_RESPONSE, 12000);
+    ensureFileOk(start, "檔案傳輸初始化失敗");
+    const fileBlockSize = 10240;
+    const fileBlocks = Math.max(1, Math.ceil(prepared.totalLength / fileBlockSize));
+    const chunkSize = filePacketSize(this.mtu);
+    const chunks = [];
+    for (let offset = 0; offset < prepared.bytes.length; offset += chunkSize) chunks.push(prepared.bytes.slice(offset, offset + chunkSize));
+    ensureFileOk(await this.file(encodeFileInfoRequest(fileBlocks), FILE_COMMAND.FILE_INFO_RESPONSE, 10000), "檔案區塊資訊提交失敗");
+    ensureFileOk(await this.file(encodeFileSendStart(prepared.totalLength, safeName), FILE_COMMAND.FILE_SEND_START_RESPONSE, 10000), "檔案開始傳輸失敗");
+    for (let block = 0; block < chunks.length; block += 1) {
+      if (activeTransferAbort) throw new Error("傳輸已取消");
+      ensureFileOk(await this.file(encodeFileSendData(block, chunks[block]), FILE_COMMAND.FILE_SEND_DATA_RESPONSE, 12000), "檔案分包寫入失敗");
+      onProgress?.(Math.min(100, 20 + Math.round(((block + 1) / chunks.length) * 72)));
+      await sleep(Number(state.appSettings.transferChunkDelay) || 0);
+    }
+    ensureFileOk(await this.file(encodeFileSendEnd(), FILE_COMMAND.FILE_SEND_END_RESPONSE, 12000), "檔案結束確認失敗");
+    ensureFileOk(await this.file(encodeFileTransferEnd(), FILE_COMMAND.END_RESPONSE, 12000), "檔案總結束確認失敗");
+    return { fileName: safeName, type, byteLength: bytes.length, transferSize: prepared.totalLength, crc: prepared.crc };
+  }
+
+  async transferFirmwarePackage(file, onProgress) {
+    await this.ensureConnected();
+    activeTransferAbort = false;
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (!bytes.length) throw new Error("Firmware file is empty");
+    const packetCount = Math.max(1, Math.ceil(bytes.length / OTA_PACKAGE_PACKET_BYTES));
+    const packageCrc = crc32Mpeg2(bytes);
+    onProgress?.({ percent: 2, message: t("firmwarePreparing", { name: file.name }) });
+    const start = await this.ota(
+      encodeOtaPackageStart(bytes.length, packetCount, packageCrc),
+      SIFLI_OTA_COMMAND.IMAGE_PACKAGE_START_RESPONSE,
+      180000
+    );
+    const startInfo = parseOtaPackageStart(start);
+    const responseFrequency = Math.max(1, Number(startInfo.responseFrequency) || 1);
+    const completedCount = Math.max(0, Math.min(Number(startInfo.completedCount) || 0, packetCount));
+    for (let packetIndex = completedCount + 1; packetIndex <= packetCount; packetIndex += 1) {
+      if (activeTransferAbort) throw new Error("傳輸已取消");
+      const offset = OTA_PACKAGE_PACKET_BYTES * (packetIndex - 1);
+      const packet = bytes.slice(offset, offset + OTA_PACKAGE_PACKET_BYTES);
+      const frame = encodeOtaPackagePacket(packetIndex, packet, crc32Mpeg2(packet));
+      if (packetIndex % responseFrequency === 0 || packetIndex === packetCount) {
+        const response = await this.ota(frame, SIFLI_OTA_COMMAND.IMAGE_PACKAGE_PACKET_RESPONSE, 60000);
+        parseOtaPackagePacket(response, packetIndex);
+      } else {
+        await this.writeFrame(frame);
+      }
+      const percent = 8 + Math.round((packetIndex / packetCount) * 84);
+      onProgress?.({ percent, message: t("firmwareProgress", { percent }) });
+      await sleep(Number(state.appSettings.transferChunkDelay) || 0);
+    }
+    onProgress?.({ percent: 94, message: t("firmwareInstalling") });
+    const end = await this.ota(encodeOtaPackageEnd(), SIFLI_OTA_COMMAND.IMAGE_PACKAGE_END_RESPONSE, 180000);
+    parseOtaPackageEnd(end);
+    onProgress?.({ percent: 100, message: t("firmwareReconnectHint") });
+    return { fileName: safeFileName(file.name), byteLength: bytes.length, packetCount, crc: packageCrc };
+  }
+}
+
+const ble = new MoniCardWebBluetooth();
+
+function parseFsInfo(message) {
+  if (!message || !message.data || message.data.length < 12) return null;
+  const blockSize = readUint32(message.data, 0);
+  const totalBlocks = readUint32(message.data, 4);
+  const freeBlocks = readUint32(message.data, 8);
+  return { blockSize, totalBlocks, freeBlocks, totalBytes: blockSize * totalBlocks, freeBytes: blockSize * freeBlocks };
+}
+
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "--";
+  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(1)}G`;
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)}M`;
+  return `${Math.round(bytes / 1024)}K`;
+}
+
+function formatFsInfo(fs) {
+  if (!fs) return { usedStorageLabel: "--", totalStorageLabel: "--", storagePercent: 0 };
+  const rawUsed = Math.max(0, fs.totalBytes - fs.freeBytes);
+  const used = Math.max(0, rawUsed - RESERVED_STORAGE_BYTES);
+  const total = Math.max(0, fs.totalBytes - RESERVED_STORAGE_BYTES);
+  return {
+    usedStorageLabel: formatBytes(used),
+    totalStorageLabel: formatBytes(total),
+    storagePercent: total ? Math.max(0, Math.min(Math.round((used / total) * 100), 100)) : 0
+  };
+}
+
+function settingsFromControlBytes(bytes) {
+  const normalized = Array.from(bytes || []).slice(0, CONTROL_INFO_BYTES);
+  while (normalized.length < CONTROL_INFO_BYTES) normalized.push(1);
+  return {
+    disableBroadcast: normalized[0] === 0,
+    disableBuzzer: normalized[1] === 0,
+    disableVibration: normalized[2] === 0,
+    disableLight: normalized[3] === 0,
+    disableInterestSensing: normalized[4] === 0,
+    disableAmbienceLight: normalized[5] === 0,
+    controlInfoBytes: normalized
+  };
+}
+
+function normalizeSettings(settings) {
+  const bytes = Array.isArray(settings.controlInfoBytes) ? settings.controlInfoBytes.slice(0, CONTROL_INFO_BYTES) : [1, 1, 1, 1, 1, 0, 0, 1];
+  while (bytes.length < CONTROL_INFO_BYTES) bytes.push(1);
+  const map = [
+    "disableBroadcast",
+    "disableBuzzer",
+    "disableVibration",
+    "disableLight",
+    "disableInterestSensing",
+    "disableAmbienceLight"
+  ];
+  map.forEach((key, index) => {
+    if (typeof settings[key] === "boolean") bytes[index] = settings[key] ? 0 : 1;
+  });
+  return settingsFromControlBytes(bytes);
+}
+
+function parseReceivedCard(data) {
+  if (!data || data.length < 14 || data[0] !== 0) return null;
+  const sourceId = data[1];
+  const sourceMac = textFromBytes(data.slice(2, 14)).replace(/[^0-9a-f]/gi, "").toUpperCase();
+  const detail = textFromBytes(data.slice(14));
+  const firstLine = detail.split("\n").find(Boolean) || sourceMac || t("card");
+  const receivedAt = new Date().toLocaleString("zh-CN", { hour12: false });
+  return {
+    id: sourceMac ? `recv-${sourceMac}` : `recv-id-${sourceId}`,
+    sourceId,
+    sourceMac,
+    title: firstLine.trim().slice(0, 2) || t("card"),
+    description: firstLine,
+    detail,
+    receivedAt
+  };
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function safeFileName(name) {
+  return String(name || "resource.bin").split("/").pop().replace(/[^a-zA-Z0-9._-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || "resource.bin";
+}
+
+function resourceStamp() {
+  return Date.now().toString(36);
+}
+
+function imageResourceFileName() {
+  return `c${resourceStamp()}.png`;
+}
+
+function motionResourceFileName() {
+  return `v${resourceStamp()}.mp4`;
+}
+
+function mediaBaseName(name, fallback = "media") {
+  return safeFileName(name || fallback).replace(/\.[^.]+$/, "").slice(0, 42) || fallback;
+}
+
+function bytesLen(text) {
+  return utf8Bytes(text).length;
+}
+
+function blobToBytes(blob) {
+  return blob.arrayBuffer().then((buffer) => new Uint8Array(buffer));
+}
+
+function canvasToBlob(canvas, type = "image/png", quality = 0.88) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Canvas export failed")), type, quality);
+  });
+}
+
+function makeCanvas(width = 240, height = 320) {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  return canvas;
+}
+
+function drawCover(ctx, source, sourceWidth, sourceHeight, width = 240, height = 320) {
+  const sourceRatio = sourceWidth / sourceHeight;
+  const targetRatio = width / height;
+  let sx = 0;
+  let sy = 0;
+  let sw = sourceWidth;
+  let sh = sourceHeight;
+  if (sourceRatio > targetRatio) {
+    sw = sourceHeight * targetRatio;
+    sx = (sourceWidth - sw) / 2;
+  } else {
+    sh = sourceWidth / targetRatio;
+    sy = (sourceHeight - sh) / 2;
+  }
+  ctx.clearRect(0, 0, width, height);
+  ctx.drawImage(source, sx, sy, sw, sh, 0, 0, width, height);
+}
+
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Image decode failed"));
+    };
+    image.src = url;
+  });
+}
+
+async function prepareImageMedia(file) {
+  const image = await loadImageFromFile(file);
+  const canvas = makeCanvas(240, 320);
+  drawCover(canvas.getContext("2d"), image, image.naturalWidth || image.width, image.naturalHeight || image.height);
+  const blob = await canvasToBlob(canvas, "image/png");
+  return {
+    bytes: await blobToBytes(blob),
+    fileName: imageResourceFileName(),
+    kind: "image",
+    label: "240x320 PNG"
+  };
+}
+
+function loadVideoFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "metadata";
+    video.onloadedmetadata = () => resolve({ video, url });
+    video.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Video decode failed"));
+    };
+    video.src = url;
+  });
+}
+
+function seekVideo(video, time) {
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      video.onseeked = null;
+      video.onerror = null;
+    };
+    video.onseeked = () => {
+      cleanup();
+      resolve();
+    };
+    video.onerror = () => {
+      cleanup();
+      reject(new Error("Video seek failed"));
+    };
+    video.currentTime = Math.max(0, Math.min(time, Math.max(0, video.duration || 0)));
+  });
+}
+
+function asciiAtom(text) {
+  const bytes = new Uint8Array(String(text || "").length);
+  for (let index = 0; index < bytes.length; index += 1) bytes[index] = String(text).charCodeAt(index) & 255;
+  return bytes;
+}
+
+function be8(value) {
+  return new Uint8Array([value & 255]);
+}
+
+function be16(value) {
+  return new Uint8Array([(value >> 8) & 255, value & 255]);
+}
+
+function be24(value) {
+  return new Uint8Array([(value >> 16) & 255, (value >> 8) & 255, value & 255]);
+}
+
+function be32(value) {
+  return new Uint8Array([(value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255]);
+}
+
+function fixed16(value) {
+  return be32((value << 16) >>> 0);
+}
+
+function zeroes(length) {
+  return new Uint8Array(length);
+}
+
+function mp4Box(type, parts = []) {
+  const body = concatBytes(parts);
+  return concatBytes([be32(body.length + 8), asciiAtom(type), body]);
+}
+
+function fullBox(type, version, flags, parts = []) {
+  return mp4Box(type, [be8(version), be24(flags), ...parts]);
+}
+
+function videoSampleEntry(width, height) {
+  const name = new Uint8Array(32);
+  const codecName = asciiAtom("Motion JPEG");
+  name[0] = codecName.length;
+  name.set(codecName, 1);
+  return mp4Box("mjpg", [
+    zeroes(6), be16(1), be16(0), be16(0), be32(0), be32(0), be32(0),
+    be16(width), be16(height), be32(0x00480000), be32(0x00480000), be32(0),
+    be16(1), name, be16(24), be16(0xffff)
+  ]);
+}
+
+function buildMjpegMp4(frames, options = {}) {
+  if (!frames.length) throw new Error("No frames to encode");
+  const frameRate = Math.max(1, Math.round(options.frameRate || 12));
+  const width = Math.max(1, Math.round(options.width || 240));
+  const height = Math.max(1, Math.round(options.height || 320));
+  const sampleSizes = frames.map((frame) => frame.byteLength);
+  const ftyp = mp4Box("ftyp", [asciiAtom("isom"), be32(512), asciiAtom("isom"), asciiAtom("iso2"), asciiAtom("mp41"), asciiAtom("mjpg")]);
+  const mdat = mp4Box("mdat", frames.map((frame) => new Uint8Array(frame)));
+  const sampleCount = frames.length;
+  const movieDurationMs = Math.round(sampleCount / frameRate * 1000);
+  const stsd = fullBox("stsd", 0, 0, [be32(1), videoSampleEntry(width, height)]);
+  const stts = fullBox("stts", 0, 0, [be32(1), be32(sampleCount), be32(1)]);
+  const stsc = fullBox("stsc", 0, 0, [be32(1), be32(1), be32(sampleCount), be32(1)]);
+  const stsz = fullBox("stsz", 0, 0, [be32(0), be32(sampleSizes.length), ...sampleSizes.map(be32)]);
+  const stco = fullBox("stco", 0, 0, [be32(1), be32(ftyp.byteLength + 8)]);
+  const stss = fullBox("stss", 0, 0, [be32(sampleCount), ...Array.from({ length: sampleCount }, (_, index) => be32(index + 1))]);
+  const stbl = mp4Box("stbl", [stsd, stts, stsc, stsz, stco, stss]);
+  const minf = mp4Box("minf", [fullBox("vmhd", 0, 1, [be16(0), be16(0), be16(0), be16(0)]), mp4Box("dinf", [fullBox("dref", 0, 0, [be32(1), fullBox("url ", 0, 1)])]), stbl]);
+  const mdia = mp4Box("mdia", [fullBox("mdhd", 0, 0, [be32(0), be32(0), be32(frameRate), be32(sampleCount), be16(21956), be16(0)]), fullBox("hdlr", 0, 0, [be32(0), asciiAtom("vide"), be32(0), be32(0), be32(0), asciiAtom("VideoHandler"), be8(0)]), minf]);
+  const tkhd = fullBox("tkhd", 0, 7, [be32(0), be32(0), be32(1), be32(0), be32(Math.max(1, movieDurationMs)), zeroes(8), be16(0), be16(0), be16(0), be16(0), fixed16(1), be32(0), be32(0), be32(0), fixed16(1), be32(0), be32(0), be32(0), be32(0x40000000), fixed16(width), fixed16(height)]);
+  const trak = mp4Box("trak", [tkhd, mdia]);
+  const mvhd = fullBox("mvhd", 0, 0, [be32(0), be32(0), be32(1000), be32(Math.max(1, movieDurationMs)), fixed16(1), be16(0x0100), be16(0), zeroes(8), fixed16(1), be32(0), be32(0), be32(0), fixed16(1), be32(0), be32(0), be32(0), be32(0x40000000), zeroes(24), be32(2)]);
+  return concatBytes([ftyp, mdat, mp4Box("moov", [mvhd, trak])]);
+}
+
+async function prepareVideoMedia(file) {
+  const { video, url } = await loadVideoFromFile(file);
+  try {
+    const canvas = makeCanvas(240, 320);
+    const ctx = canvas.getContext("2d");
+    const duration = Math.min(Number(video.duration) || 0, 8);
+    const frameRate = 12;
+    const frameCount = Math.max(1, Math.ceil(duration * frameRate));
+    const frames = [];
+    for (let index = 0; index < frameCount; index += 1) {
+      await seekVideo(video, frameCount === 1 ? 0 : Math.min(duration - 0.01, index / frameRate));
+      drawCover(ctx, video, video.videoWidth || 240, video.videoHeight || 320);
+      frames.push(await blobToBytes(await canvasToBlob(canvas, "image/jpeg", 0.82)));
+    }
+    return {
+      bytes: buildMjpegMp4(frames, { frameRate, width: 240, height: 320 }),
+      fileName: motionResourceFileName(),
+      kind: "motion",
+      label: `240x320 MJPEG MP4 · ${frameCount} frames`
+    };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function gifReadU16(bytes, offset) {
+  return bytes[offset] | (bytes[offset + 1] << 8);
+}
+
+function gifConcat(parts, totalLength) {
+  const out = new Uint8Array(totalLength);
+  let offset = 0;
+  parts.forEach((part) => {
+    out.set(part, offset);
+    offset += part.length;
+  });
+  return out;
+}
+
+function gifReadSubBlocks(bytes, offset) {
+  const parts = [];
+  let total = 0;
+  let cursor = offset;
+  while (cursor < bytes.length) {
+    const size = bytes[cursor];
+    cursor += 1;
+    if (!size) break;
+    if (cursor + size > bytes.length) throw new Error("GIF data block is incomplete");
+    const part = bytes.subarray(cursor, cursor + size);
+    parts.push(part);
+    total += part.length;
+    cursor += size;
+  }
+  return { bytes: gifConcat(parts, total), nextOffset: cursor };
+}
+
+function gifReadColorTable(bytes, offset, packed) {
+  const length = 3 * (1 << (1 + (packed & 7)));
+  if (offset + length > bytes.length) throw new Error("GIF color table is incomplete");
+  return { table: bytes.subarray(offset, offset + length), nextOffset: offset + length };
+}
+
+function gifClearRect(rgba, canvasWidth, rect, color) {
+  const left = Math.max(0, rect.left);
+  const top = Math.max(0, rect.top);
+  const right = Math.min(canvasWidth, rect.left + rect.width);
+  const canvasHeight = rgba.length / 4 / canvasWidth;
+  const bottom = Math.min(canvasHeight, rect.top + rect.height);
+  for (let y = top; y < bottom; y += 1) {
+    for (let x = left; x < right; x += 1) {
+      const offset = 4 * (y * canvasWidth + x);
+      rgba[offset] = color[0];
+      rgba[offset + 1] = color[1];
+      rgba[offset + 2] = color[2];
+      rgba[offset + 3] = color[3];
+    }
+  }
+}
+
+function gifDeinterlace(indices, width, height) {
+  const out = new Uint8Array(indices.length);
+  const starts = [0, 4, 2, 1];
+  const steps = [8, 8, 4, 2];
+  let source = 0;
+  for (let pass = 0; pass < starts.length; pass += 1) {
+    for (let y = starts[pass]; y < height; y += steps[pass]) {
+      out.set(indices.subarray(source, source + width), y * width);
+      source += width;
+    }
+  }
+  return out;
+}
+
+function gifLzwDecode(minCodeSize, data, expectedLength) {
+  const clearCode = 1 << minCodeSize;
+  const endCode = clearCode + 1;
+  const prefixes = new Int16Array(4096);
+  const suffixes = new Uint8Array(4096);
+  const stack = new Uint8Array(4097);
+  const output = new Uint8Array(expectedLength);
+  let bitOffset = 0;
+  let codeSize = minCodeSize + 1;
+  let nextCode = endCode + 1;
+  let oldCode = -1;
+  let outOffset = 0;
+
+  function reset() {
+    for (let index = 0; index < clearCode; index += 1) {
+      prefixes[index] = -1;
+      suffixes[index] = index;
+    }
+    codeSize = minCodeSize + 1;
+    nextCode = endCode + 1;
+    oldCode = -1;
+  }
+
+  function readCode() {
+    if (bitOffset + codeSize > data.length * 8) return null;
+    let code = 0;
+    for (let bit = 0; bit < codeSize; bit += 1) {
+      if (data[(bitOffset + bit) >> 3] & (1 << ((bitOffset + bit) & 7))) code |= 1 << bit;
+    }
+    bitOffset += codeSize;
+    return code;
+  }
+
+  function outputCode(code) {
+    let stackSize = 0;
+    let cursor = code;
+    while (cursor > clearCode && stackSize < stack.length - 1) {
+      stack[stackSize] = suffixes[cursor];
+      stackSize += 1;
+      cursor = prefixes[cursor];
+    }
+    if (stackSize >= stack.length - 1) throw new Error("GIF LZW dictionary is invalid");
+    const first = cursor < clearCode ? cursor : suffixes[cursor];
+    stack[stackSize] = first;
+    stackSize += 1;
+    for (let index = stackSize - 1; index >= 0 && outOffset < output.length; index -= 1) {
+      output[outOffset] = stack[index];
+      outOffset += 1;
+    }
+    return first;
+  }
+
+  reset();
+  while (outOffset < output.length) {
+    const code = readCode();
+    if (code === null) break;
+    if (code === clearCode) {
+      reset();
+      continue;
+    }
+    if (code === endCode) break;
+    let first;
+    if (oldCode < 0) {
+      first = outputCode(code);
+      oldCode = code;
+      continue;
+    }
+    if (code < nextCode) {
+      first = outputCode(code);
+    } else if (code === nextCode) {
+      first = outputCode(oldCode);
+      if (outOffset < output.length) {
+        output[outOffset] = first;
+        outOffset += 1;
+      }
+    } else {
+      throw new Error("GIF LZW data is invalid");
+    }
+    prefixes[nextCode] = oldCode;
+    suffixes[nextCode] = first;
+    nextCode += 1;
+    if (nextCode === (1 << codeSize) && codeSize < 12) codeSize += 1;
+    oldCode = code;
+  }
+  return output;
+}
+
+function gifDrawFrame(canvasRgba, canvasWidth, canvasHeight, frame, palette) {
+  const transparentIndex = frame.transparentIndex;
+  for (let y = 0; y < frame.height; y += 1) {
+    const targetY = frame.top + y;
+    if (targetY < 0 || targetY >= canvasHeight) continue;
+    for (let x = 0; x < frame.width; x += 1) {
+      const targetX = frame.left + x;
+      if (targetX < 0 || targetX >= canvasWidth) continue;
+      const colorIndex = frame.indices[y * frame.width + x];
+      if (transparentIndex !== null && colorIndex === transparentIndex) continue;
+      const colorOffset = colorIndex * 3;
+      if (colorOffset + 2 >= palette.length) continue;
+      const targetOffset = 4 * (targetY * canvasWidth + targetX);
+      canvasRgba[targetOffset] = palette[colorOffset];
+      canvasRgba[targetOffset + 1] = palette[colorOffset + 1];
+      canvasRgba[targetOffset + 2] = palette[colorOffset + 2];
+      canvasRgba[targetOffset + 3] = 255;
+    }
+  }
+}
+
+function parseGifBytes(input) {
+  const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+  if (bytes.length < 13) throw new Error("GIF file is too small");
+  const signature = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5]);
+  if (signature !== "GIF87a" && signature !== "GIF89a") throw new Error("Not a valid GIF file");
+  let offset = 6;
+  const width = gifReadU16(bytes, offset);
+  const height = gifReadU16(bytes, offset + 2);
+  const packed = bytes[offset + 4];
+  const backgroundIndex = bytes[offset + 5];
+  offset += 7;
+  let globalPalette = null;
+  if (packed & 128) {
+    const global = gifReadColorTable(bytes, offset, packed);
+    globalPalette = global.table;
+    offset = global.nextOffset;
+  }
+  const background = [0, 0, 0, 0];
+  if (globalPalette) {
+    const bgOffset = backgroundIndex * 3;
+    if (bgOffset + 2 < globalPalette.length) {
+      background[0] = globalPalette[bgOffset];
+      background[1] = globalPalette[bgOffset + 1];
+      background[2] = globalPalette[bgOffset + 2];
+      background[3] = 255;
+    }
+  }
+  const canvasRgba = new Uint8ClampedArray(width * height * 4);
+  const frames = [];
+  let control = { delayMs: 100, disposal: 0, transparentIndex: null };
+  let previousRect = null;
+  let previousDisposal = 0;
+  let restoreRgba = null;
+  while (offset < bytes.length) {
+    const blockId = bytes[offset];
+    offset += 1;
+    if (blockId === 0x3b) break;
+    if (blockId === 0x21) {
+      const label = bytes[offset];
+      offset += 1;
+      if (label === 0xf9) {
+        const blockSize = bytes[offset];
+        offset += 1;
+        if (blockSize !== 4 || offset + blockSize > bytes.length) throw new Error("Invalid GIF graphics control block");
+        const flags = bytes[offset];
+        const delayMs = gifReadU16(bytes, offset + 1) * 10;
+        control = {
+          delayMs: delayMs > 0 ? delayMs : 100,
+          disposal: (flags >> 2) & 7,
+          transparentIndex: flags & 1 ? bytes[offset + 3] : null
+        };
+        offset += blockSize;
+        if (bytes[offset] === 0) offset += 1;
+      } else {
+        offset = gifReadSubBlocks(bytes, offset).nextOffset;
+      }
+      continue;
+    }
+    if (blockId !== 0x2c) throw new Error("GIF contains an unsupported block");
+    if (previousRect) {
+      if (previousDisposal === 2) gifClearRect(canvasRgba, width, previousRect, background);
+      if (previousDisposal === 3 && restoreRgba) canvasRgba.set(restoreRgba);
+    }
+    const left = gifReadU16(bytes, offset);
+    const top = gifReadU16(bytes, offset + 2);
+    const frameWidth = gifReadU16(bytes, offset + 4);
+    const frameHeight = gifReadU16(bytes, offset + 6);
+    const imagePacked = bytes[offset + 8];
+    offset += 9;
+    let palette = globalPalette;
+    if (imagePacked & 128) {
+      const local = gifReadColorTable(bytes, offset, imagePacked);
+      palette = local.table;
+      offset = local.nextOffset;
+    }
+    if (!palette) throw new Error("GIF is missing a color table");
+    const minCodeSize = bytes[offset];
+    offset += 1;
+    const subBlocks = gifReadSubBlocks(bytes, offset);
+    offset = subBlocks.nextOffset;
+    let indices = gifLzwDecode(minCodeSize, subBlocks.bytes, frameWidth * frameHeight);
+    if (imagePacked & 64) indices = gifDeinterlace(indices, frameWidth, frameHeight);
+    restoreRgba = control.disposal === 3 ? new Uint8ClampedArray(canvasRgba) : null;
+    gifDrawFrame(canvasRgba, width, height, {
+      left,
+      top,
+      width: frameWidth,
+      height: frameHeight,
+      indices,
+      transparentIndex: control.transparentIndex
+    }, palette);
+    frames.push({
+      index: frames.length,
+      delayMs: control.delayMs,
+      disposal: control.disposal,
+      rgba: new Uint8ClampedArray(canvasRgba)
+    });
+    previousRect = { left, top, width: frameWidth, height: frameHeight };
+    previousDisposal = control.disposal;
+    control = { delayMs: 100, disposal: 0, transparentIndex: null };
+  }
+  if (!frames.length) throw new Error("GIF has no usable frames");
+  let elapsed = 0;
+  frames.forEach((frame) => {
+    frame.startMs = elapsed;
+    elapsed += frame.delayMs;
+    frame.endMs = elapsed;
+  });
+  return { width, height, frames, frameCount: frames.length, totalDurationMs: elapsed };
+}
+
+function gifFrameAtMs(gif, ms) {
+  const total = Math.max(gif.totalDurationMs || 0, 1);
+  const target = Math.max(0, Math.min(Math.round(ms || 0), total - 1));
+  return gif.frames.find((frame) => target < frame.endMs) || gif.frames[gif.frames.length - 1];
+}
+
+function sampleGifFrames(gif, maxDurationMs = 8000, maxFrameRate = 12) {
+  const duration = Math.min(gif.totalDurationMs || 0, maxDurationMs);
+  const sourceRate = gif.frameCount && gif.totalDurationMs ? Math.max(1, Math.round(1000 * gif.frameCount / gif.totalDurationMs)) : 1;
+  const frameRate = Math.max(1, Math.min(sourceRate, maxFrameRate));
+  const frameCount = Math.max(1, Math.ceil(duration / (1000 / frameRate)));
+  return {
+    frameRate,
+    durationMs: duration,
+    frames: Array.from({ length: frameCount }, (_, index) => gifFrameAtMs(gif, Math.min(duration - 1, Math.round(index * 1000 / frameRate))))
+  };
+}
+
+async function prepareGifMedia(file) {
+  const gif = parseGifBytes(await file.arrayBuffer());
+  const canvas = makeCanvas(240, 320);
+  const sourceCanvas = makeCanvas(gif.width, gif.height);
+  const sourceCtx = sourceCanvas.getContext("2d");
+  const ctx = canvas.getContext("2d");
+  const sample = sampleGifFrames(gif);
+  const frames = [];
+  for (const frame of sample.frames) {
+    sourceCtx.putImageData(new ImageData(frame.rgba, gif.width, gif.height), 0, 0);
+    drawCover(ctx, sourceCanvas, gif.width, gif.height);
+    frames.push(await blobToBytes(await canvasToBlob(canvas, "image/jpeg", 0.82)));
+  }
+  return {
+    bytes: buildMjpegMp4(frames, { frameRate: sample.frameRate, width: 240, height: 320 }),
+    fileName: motionResourceFileName(),
+    kind: "motion",
+    label: `240x320 MJPEG MP4 · GIF ${frames.length} frames`
+  };
+}
+
+async function prepareMediaFile(file) {
+  const type = String(file.type || "").toLowerCase();
+  const name = String(file.name || "").toLowerCase();
+  if (type.includes("gif") || name.endsWith(".gif")) return prepareGifMedia(file);
+  if (type.startsWith("video/")) return prepareVideoMedia(file);
+  if (type.startsWith("image/")) return prepareImageMedia(file);
+  throw new Error("Unsupported media type");
+}
+
+function titleFromCard(text) {
+  const clean = String(text || "").trim();
+  return clean ? clean.slice(0, 2) : t("card");
+}
+
+async function connectFlow() {
+  try {
+    setBanner(t("chooseDeviceBanner"));
+    await ble.requestAndConnect();
+    const summary = await ble.readSummary({ name: ble.device.name });
+    upsertDevice(summary);
+    setBanner("");
+    toast(t("connectedToast"));
+    setState({ currentRoute: "detail" });
+  } catch (error) {
+    console.error("Connect failed", error);
+    setBanner("");
+    toast(formatError(error, t("connectFailed")));
+  }
+}
+
+async function refreshCurrentDevice(silent = false) {
+  const current = getCurrentDevice();
+  if (!current) return toast(t("noDevice"));
+  try {
+    if (!ble.device || !ble.device.gatt.connected) await ble.connectGranted(current);
+    const summary = await ble.readSummary(current);
+    upsertDevice({ ...current, ...summary });
+    if (!silent) toast(t("deviceUpdated"));
+    render();
+  } catch (error) {
+    toast(formatError(error, t("updateFailed")));
+  }
+}
+
+function render() {
+  const route = routes.find(([key]) => key === state.currentRoute) || routes[0];
+  document.documentElement.lang = currentLocale();
+  document.title = t("appTitle");
+  $("#brandName").textContent = t("brandName");
+  $("#connectBtn").textContent = t("connectDevice");
+  $("#disconnectBtn").textContent = t("disconnect");
+  $("#disconnectBtn").title = t("disconnect");
+  renderLanguageSelect();
+  $("#pageTitle").textContent = t(route[1]);
+  $("#eyebrow").textContent = ble.connection ? t("eyebrowConnected") : t("eyebrowWeb");
+  renderNav();
+  renderSupport();
+  route[2]();
+}
+
+function renderNav() {
+  $("#nav").innerHTML = routes.map(([key, label]) => {
+    const disabled = state.firmwareBusy && key !== "firmware";
+    return `<button class="${state.currentRoute === key ? "active" : ""}" data-route="${key}" type="button" ${disabled ? "disabled" : ""}>${t(label)}</button>`;
+  }).join("");
+  $("#nav").querySelectorAll("button").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (state.firmwareBusy && button.dataset.route !== "firmware") return;
+      setState({ currentRoute: button.dataset.route });
+    });
+  });
+}
+
+function renderSupport() {
+  const secure = window.isSecureContext;
+  const supported = Boolean(navigator.bluetooth && secure);
+  $("#supportDot").classList.toggle("ok", supported);
+  $("#supportTitle").textContent = supported ? t("bluetoothReady") : t("bluetoothUnavailable");
+  $("#supportText").textContent = supported ? t("bluetoothReadyDesc") : secure ? t("bluetoothUnsupportedDesc") : t("bluetoothSecureDesc");
+}
+
+function renderLanguageSelect() {
+  const select = $("#languageSelect");
+  const mode = state.localeMode || "auto";
+  const options = [
+    ["auto", t("autoLanguage")],
+    ["zh-Hant", localeNames["zh-Hant"]],
+    ["en", localeNames.en],
+    ["ja", localeNames.ja]
+  ];
+  select.innerHTML = options.map(([value, label]) => `<option value="${value}" ${mode === value ? "selected" : ""}>${escapeHtml(label)}</option>`).join("");
+  select.onchange = () => {
+    setLocaleMode(select.value);
+  };
+}
+
+function setLocaleMode(localeMode) {
+  localStorage.setItem(LOCALE_STORAGE_KEY, localeMode);
+  state.localeMode = localeMode;
+  state.locale = localeMode === "auto" ? detectLocale() : localeMode;
+  saveState();
+  render();
+}
+
+function renderDevices() {
+  const cards = state.devices.map((device) => deviceCard(device)).join("");
+  view.innerHTML = `
+    <div class="panel">
+      <h2>${t("devicesList")}</h2>
+      <div class="actions">
+        <button class="primary-btn" id="scanAddBtn" type="button">${t("connectNewDevice")}</button>
+        <button class="secondary-btn" id="refreshKnownBtn" type="button">${t("refreshCurrentDevice")}</button>
+      </div>
+    </div>
+    <div class="grid device-grid">${cards || `<div class="empty">${t("emptyDevices")}</div>`}</div>
+  `;
+  $("#scanAddBtn").addEventListener("click", connectFlow);
+  $("#refreshKnownBtn").addEventListener("click", () => refreshCurrentDevice());
+  view.querySelectorAll("[data-open-device]").forEach((button) => {
+    button.addEventListener("click", () => setState({ currentDeviceId: button.dataset.openDevice, currentRoute: "detail" }));
+  });
+  view.querySelectorAll("[data-forget-device]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.devices = state.devices.filter((item) => item.id !== button.dataset.forgetDevice);
+      if (state.currentDeviceId === button.dataset.forgetDevice) state.currentDeviceId = state.devices[0]?.id || "";
+      saveState();
+      render();
+    });
+  });
+}
+
+function deviceCard(device) {
+  return `
+    <article class="card device-card">
+      <div class="device-head">
+        <div>
+          <div class="device-name">${escapeHtml(device.name || "MoniCard")}</div>
+          <div class="muted">${escapeHtml(device.sn || device.id || "--")}</div>
+        </div>
+        <span class="badge ${device.connected ? "" : "off"}">${escapeHtml(device.statusLabel || t("disconnected"))}</span>
+      </div>
+      <div class="stats">
+        <div class="stat"><span>${t("battery")}</span><strong>${escapeHtml(String(device.battery ?? "--"))}%</strong></div>
+        <div class="stat"><span>${t("firmwareVersion")}</span><strong>${escapeHtml(device.firmwareVersion || "--")}</strong></div>
+        <div class="stat"><span>${t("storage")}</span><strong>${escapeHtml(device.usedStorageLabel || "--")} / ${escapeHtml(device.totalStorageLabel || "--")}</strong></div>
+      </div>
+      <div class="progress"><span style="width:${Math.max(0, Math.min(Number(device.storagePercent) || 0, 100))}%"></span></div>
+      <div class="actions">
+        <button class="primary-btn" data-open-device="${escapeAttr(device.id)}" type="button">${t("manage")}</button>
+        <button class="danger-btn" data-forget-device="${escapeAttr(device.id)}" type="button">${t("remove")}</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderDetail() {
+  const device = getCurrentDevice();
+  if (!device) {
+    view.innerHTML = `<div class="empty">${t("noDeviceSelected")}</div>`;
+    return;
+  }
+  view.innerHTML = `
+    <div class="split">
+      <article class="panel">
+        <h2>${escapeHtml(device.name || "MoniCard")}</h2>
+        <div class="stats">
+          <div class="stat"><span>${t("serialNumber")}</span><strong>${escapeHtml(device.sn || "--")}</strong></div>
+          <div class="stat"><span>${t("battery")}</span><strong>${escapeHtml(String(device.battery ?? "--"))}%</strong></div>
+          <div class="stat"><span>${t("firmwareVersion")}</span><strong>${escapeHtml(device.firmwareVersion || "--")}</strong></div>
+        </div>
+        <p class="muted">${t("storage")}：${escapeHtml(device.usedStorageLabel || "--")} / ${escapeHtml(device.totalStorageLabel || "--")}</p>
+        <div class="progress"><span style="width:${Math.max(0, Math.min(Number(device.storagePercent) || 0, 100))}%"></span></div>
+        <div class="actions" style="margin-top:16px">
+          <button id="refreshDeviceBtn" class="primary-btn" type="button">${t("refreshDeviceStatus")}</button>
+          <button id="renameDeviceBtn" class="secondary-btn" type="button">${t("saveName")}</button>
+        </div>
+        <div class="field" style="margin-top:14px">
+          <label>${t("deviceName")}</label>
+          <input id="deviceNameInput" value="${escapeAttr(device.name || "")}">
+        </div>
+      </article>
+      <div class="grid feature-grid">
+        ${featureButton("card", t("cardFeature"), t("cardFeatureDesc"))}
+        ${featureButton("media", t("mediaFeature"), t("mediaFeatureDesc"))}
+        ${featureButton("tags", t("tagsFeature"), t("tagsFeatureDesc"))}
+        ${featureButton("settings", t("settingsFeature"), t("settingsFeatureDesc"))}
+        ${featureButton("received", t("receivedFeature"), t("receivedFeatureDesc"))}
+        ${featureButton("firmware", t("firmwareFeature"), t("firmwareFeatureDesc"))}
+      </div>
+    </div>
+  `;
+  $("#refreshDeviceBtn").addEventListener("click", () => refreshCurrentDevice());
+  $("#renameDeviceBtn").addEventListener("click", () => {
+    updateDevice(device.id, { name: $("#deviceNameInput").value.trim() || "MoniCard" });
+    toast(t("nameSaved"));
+    render();
+  });
+  view.querySelectorAll("[data-feature]").forEach((button) => {
+    button.addEventListener("click", () => setState({ currentRoute: button.dataset.feature }));
+  });
+}
+
+function featureButton(key, title, desc) {
+  return `<button class="feature-btn" data-feature="${key}" type="button"><strong>${title}</strong><span>${desc}</span></button>`;
+}
+
+function renderCard() {
+  const device = getCurrentDevice();
+  const text = device?.cardPreview || t("defaultCard");
+  view.innerHTML = `
+    <div class="split">
+      <div class="panel form">
+        <h2>${t("cardContent")}</h2>
+        <div class="field">
+          <label>${t("maxBytes", { count: CARD_INFO_MAX_BYTES })}</label>
+          <textarea id="cardText">${escapeHtml(text)}</textarea>
+        </div>
+        <div class="muted" id="cardBytes">${bytesLen(text)} / ${CARD_INFO_MAX_BYTES} bytes</div>
+        <div class="actions">
+          <button id="readCardBtn" class="secondary-btn" type="button">${t("readFromDevice")}</button>
+          <button id="writeCardBtn" class="primary-btn" type="button">${t("uploadCard")}</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>${t("preview")}</h2>
+        <div class="stat"><span>${t("avatarText")}</span><strong id="cardAvatar">${escapeHtml(titleFromCard(text))}</strong></div>
+        <pre class="log" id="cardPreview">${escapeHtml(text || t("noCardContent"))}</pre>
+      </div>
+    </div>
+  `;
+  const input = $("#cardText");
+  input.addEventListener("input", () => {
+    const value = input.value.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    $("#cardBytes").textContent = `${bytesLen(value)} / ${CARD_INFO_MAX_BYTES} bytes`;
+    $("#cardAvatar").textContent = titleFromCard(value);
+    $("#cardPreview").textContent = value || t("noCardContent");
+  });
+  $("#readCardBtn").addEventListener("click", async () => {
+    try {
+      const cardInfo = await ble.readCardInfo();
+      input.value = cardInfo;
+      input.dispatchEvent(new Event("input"));
+      if (device) updateDevice(device.id, { cardPreview: cardInfo, connected: true, statusLabel: t("online") });
+      toast(t("cardRead"));
+    } catch (error) {
+      toast(formatError(error, t("readFailed")));
+    }
+  });
+  $("#writeCardBtn").addEventListener("click", async () => {
+    try {
+      if (bytesLen(input.value) > CARD_INFO_MAX_BYTES) throw new Error("名片内容过长");
+      await ble.writeCardInfo(input.value);
+      if (device) updateDevice(device.id, { cardPreview: input.value, connected: true, statusLabel: t("settingsSynced") });
+      toast(t("cardUploaded"));
+    } catch (error) {
+      toast(formatError(error, t("uploadFailed")));
+    }
+  });
+}
+
+function renderMedia() {
+  view.innerHTML = `
+    <div class="panel form">
+      <h2>${t("mediaTransfer")}</h2>
+      <p class="muted">${t("mediaHelp")}</p>
+      <p class="muted">${t("mediaProcessHelp")}</p>
+      <div class="field">
+        <label>${t("fileType")}</label>
+        <input value="${t("resourceFile")}" disabled>
+        <span class="muted">${t("fileTypeHelp")}</span>
+      </div>
+      <div class="actions">
+        <button id="pickFileBtn" class="primary-btn" type="button">${t("pickAndTransfer")}</button>
+        <button id="cancelTransferBtn" class="danger-btn" type="button">${t("cancelTransfer")}</button>
+      </div>
+      <div id="mediaDropZone" class="drop-zone">${t("dropMedia")}</div>
+      <div class="progress"><span id="transferProgress"></span></div>
+      <pre id="transferLog" class="log">${t("waitingFile")}</pre>
+    </div>
+  `;
+  const transferSelectedFile = async (file) => {
+    if (!file) return;
+    $("#transferLog").textContent = t("processingMedia");
+    $("#transferProgress").style.width = "0%";
+    try {
+      const prepared = await prepareMediaFile(file);
+      $("#transferLog").textContent = `${t("mediaPrepared", { name: prepared.fileName, size: formatBytes(prepared.bytes.byteLength) })}\n${prepared.label}`;
+      await ble.transferBytes(prepared.bytes, prepared.fileName, FILE_TYPE.RESOURCE, (percent) => {
+        $("#transferProgress").style.width = `${percent}%`;
+        $("#transferLog").textContent = t("fileTransferring", { name: prepared.fileName, percent });
+      });
+      $("#transferProgress").style.width = "100%";
+      $("#transferLog").textContent = t("fileComplete", { name: prepared.fileName });
+      await refreshCurrentDevice(true);
+      toast(t("transferDone"));
+    } catch (error) {
+      $("#transferLog").textContent += `\n${formatError(error, t("transferFailed"))}`;
+      toast(formatError(error, t("transferFailed")));
+    } finally {
+      filePicker.value = "";
+    }
+  };
+  $("#pickFileBtn").addEventListener("click", () => {
+    filePicker.accept = "image/*,video/*,.gif";
+    filePicker.onchange = () => transferSelectedFile(filePicker.files[0]);
+    filePicker.click();
+  });
+  const dropZone = $("#mediaDropZone");
+  ["dragenter", "dragover"].forEach((eventName) => {
+    dropZone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropZone.classList.add("active");
+      dropZone.textContent = t("dropMediaActive");
+    });
+  });
+  ["dragleave", "drop"].forEach((eventName) => {
+    dropZone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropZone.classList.remove("active");
+      dropZone.textContent = t("dropMedia");
+    });
+  });
+  dropZone.addEventListener("drop", (event) => {
+    transferSelectedFile(event.dataTransfer?.files?.[0]);
+  });
+  $("#cancelTransferBtn").addEventListener("click", () => {
+    activeTransferAbort = true;
+    toast(t("cancelingTransfer"));
+  });
+}
+
+function renderTags() {
+  const rawCategories = state.tagCategories.length ? state.tagCategories : [{ name: t("category"), tags: [t("tag")] }];
+  const categories = localizeTagCategories(rawCategories);
+  const device = getCurrentDevice();
+  const defaultCat = Math.max(0, categories.findIndex((item) => item.name === device?.tagCategory || item.originalName === device?.tagCategory));
+  view.innerHTML = `
+    <div class="panel form">
+      <h2>${t("tagSettings")}</h2>
+      <div class="field">
+        <label>${t("category")}</label>
+        <select id="tagCategory">${categories.map((item, index) => `<option value="${index}" ${index === defaultCat ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}</select>
+      </div>
+      <div class="field">
+        <label>${t("tag")}</label>
+        <select id="tagName"></select>
+      </div>
+      <div class="actions">
+        <button id="addTagBtn" class="secondary-btn" type="button">${t("addToList")}</button>
+        <button id="writeTagsBtn" class="primary-btn" type="button">${t("writeToDevice")}</button>
+      </div>
+      <div class="tag-list" id="draftTags"></div>
+    </div>
+  `;
+  const drafts = [];
+  const categorySelect = $("#tagCategory");
+  const tagSelect = $("#tagName");
+  const renderTagOptions = () => {
+    const cat = categories[Number(categorySelect.value)] || categories[0];
+    tagSelect.innerHTML = (cat.tags || []).filter(Boolean).map((tag, index) => `<option value="${index}">${escapeHtml(typeof tag === "string" ? tag : tag.name || tag.title || tag.label)}</option>`).join("");
+  };
+  const renderDrafts = () => {
+    $("#draftTags").innerHTML = drafts.map((tag, index) => `<button class="tag-chip" data-remove-tag="${index}" type="button">${escapeHtml(tag.categoryName)} · ${escapeHtml(tag.tagName)}</button>`).join("") || `<span class="muted">${t("tagHint")}</span>`;
+    $("#draftTags").querySelectorAll("[data-remove-tag]").forEach((button) => {
+      button.addEventListener("click", () => {
+        drafts.splice(Number(button.dataset.removeTag), 1);
+        renderDrafts();
+      });
+    });
+  };
+  categorySelect.addEventListener("change", renderTagOptions);
+  renderTagOptions();
+  renderDrafts();
+  $("#addTagBtn").addEventListener("click", () => {
+    if (drafts.length >= TAGS_MAX_COUNT) return toast(t("maxTags", { count: TAGS_MAX_COUNT }));
+    const catIndex = Number(categorySelect.value);
+    const tagIndex = Number(tagSelect.value);
+    const cat = categories[catIndex];
+    const tag = cat.tags[tagIndex];
+    const tagName = typeof tag === "string" ? tag : tag.name || tag.title || tag.label;
+    const payload = { category: categoryId(cat, catIndex), tagId: tagId(tag, tagIndex), categoryName: cat.name, tagName };
+    if (drafts.some((item) => item.category === payload.category && item.tagId === payload.tagId)) return toast(t("tagExists"));
+    drafts.push(payload);
+    renderDrafts();
+  });
+  $("#writeTagsBtn").addEventListener("click", async () => {
+    try {
+      await ble.writeTags(drafts);
+      if (device && drafts[0]) {
+        updateDevice(device.id, {
+          tagCategory: drafts[0].categoryName,
+          tagName: drafts[0].tagName,
+          tagCategoryId: drafts[0].category,
+          tagId: drafts[0].tagId,
+          statusLabel: t("settingsSynced")
+        });
+      }
+      toast(t("tagsWritten"));
+    } catch (error) {
+      toast(formatError(error, t("writeFailed")));
+    }
+  });
+}
+
+function categoryId(category, index) {
+  const value = category && (category.categoryId ?? category.category_id ?? category.id);
+  return Number.isInteger(Number(value)) ? Number(value) : index + 1;
+}
+
+function tagId(tag, index) {
+  const value = tag && typeof tag === "object" ? (tag.tagId ?? tag.tag_id ?? tag.id) : undefined;
+  return Number.isInteger(Number(value)) ? Number(value) : index + 1;
+}
+
+function renderDeviceSettings() {
+  const controls = [
+    ["disableBuzzer", t("buzzer"), t("buzzerDesc")],
+    ["disableVibration", t("vibration"), t("vibrationDesc")],
+    ["disableLight", t("light"), t("lightDesc")],
+    ["disableInterestSensing", t("interest"), t("interestDesc")],
+    ["disableAmbienceLight", t("ambience"), t("ambienceDesc")],
+    ["disableBroadcast", t("broadcast"), t("broadcastDesc")]
+  ];
+  view.innerHTML = `
+    <div class="split">
+      <div class="panel">
+        <h2>${t("deviceSwitches")}</h2>
+        <div class="actions">
+          <button id="readSettingsBtn" class="secondary-btn" type="button">${t("readSettings")}</button>
+        </div>
+        <p id="settingsStatus" class="muted">${ble.connection ? t("autoReadingSettings") : t("autoReadSkipped")}</p>
+        <div id="switches">${controls.map(([key, title, desc]) => `
+          <label class="switch-row">
+            <span><strong>${title}</strong><br><span class="muted">${desc}</span></span>
+            <input class="switch" data-setting="${key}" type="checkbox" ${state.deviceSettings[key] ? "" : "checked"}>
+          </label>
+        `).join("")}</div>
+      </div>
+      <div class="panel form">
+        <h2>${t("videoCarousel")}</h2>
+        <label class="switch-row">
+          <span><strong>${t("carouselEnabled")}</strong><br><span class="muted">${t("carouselSeconds")}</span></span>
+          <input id="carouselToggle" class="switch" type="checkbox" ${Number(getCurrentDevice()?.carouselDuration) > 0 ? "checked" : ""}>
+        </label>
+        <div class="field">
+          <label>${t("carouselSeconds")}</label>
+          <input id="carouselInput" type="number" min="0" max="3600" value="${Number(getCurrentDevice()?.carouselDuration) || 0}">
+        </div>
+        <div class="actions">
+          <button id="readCarouselBtn" class="secondary-btn" type="button">${t("readCarousel")}</button>
+          <button id="writeCarouselBtn" class="primary-btn" type="button">${t("saveCarousel")}</button>
+        </div>
+      </div>
+    </div>
+  `;
+  $("#readSettingsBtn").addEventListener("click", async () => {
+    await readSettingsAndCarousel({ notify: true });
+  });
+  view.querySelectorAll("[data-setting]").forEach((input) => {
+    input.addEventListener("change", async () => {
+      const next = { ...state.deviceSettings, [input.dataset.setting]: !input.checked };
+      try {
+        const saved = await ble.writeControlSettings(next);
+        state.deviceSettings = saved;
+        saveState();
+        toast(t("settingsSynced"));
+      } catch (error) {
+        input.checked = !input.checked;
+        toast(formatError(error, t("syncFailed")));
+      }
+    });
+  });
+  $("#readCarouselBtn").addEventListener("click", async () => {
+    try {
+      const seconds = await ble.readCarousel();
+      $("#carouselInput").value = seconds;
+      const device = getCurrentDevice();
+      if (device) updateDevice(device.id, { carouselDuration: seconds });
+      toast(t("carouselRead"));
+    } catch (error) {
+      toast(formatError(error, t("readFailed")));
+    }
+  });
+  $("#carouselToggle").addEventListener("change", async (event) => {
+    const nextSeconds = event.target.checked ? Math.max(1, Number($("#carouselInput").value) || 3) : 0;
+    $("#carouselInput").value = nextSeconds;
+    await saveCarouselSeconds(nextSeconds, event.target);
+  });
+  $("#writeCarouselBtn").addEventListener("click", async () => {
+    const seconds = $("#carouselToggle").checked ? Number($("#carouselInput").value) || 1 : 0;
+    await saveCarouselSeconds(seconds);
+  });
+  if (ble.connection) setTimeout(() => readSettingsAndCarousel({ notify: false }), 0);
+}
+
+async function readSettingsAndCarousel(options = {}) {
+  try {
+    const status = $("#settingsStatus");
+    if (status) status.textContent = t("autoReadingSettings");
+    state.deviceSettings = await ble.readControlSettings();
+    const seconds = await ble.readCarousel().catch(() => Number(getCurrentDevice()?.carouselDuration) || 0);
+    const device = getCurrentDevice();
+    if (device) updateDevice(device.id, { carouselDuration: seconds, connected: true, statusLabel: t("online") });
+    saveState();
+    if (options.notify) toast(t("settingsRead"));
+    render();
+  } catch (error) {
+    if (options.notify) toast(formatError(error, t("readFailed")));
+    const status = $("#settingsStatus");
+    if (status) status.textContent = formatError(error, t("readFailed"));
+  }
+}
+
+async function saveCarouselSeconds(seconds, toggleElement) {
+  try {
+    const normalized = Math.max(0, Math.min(Number(seconds) || 0, 3600));
+    await ble.writeCarousel(normalized);
+    const device = getCurrentDevice();
+    if (device) updateDevice(device.id, { carouselDuration: normalized });
+    $("#carouselInput").value = normalized;
+    $("#carouselToggle").checked = normalized > 0;
+    toast(normalized > 0 ? t("carouselSaved") : t("carouselOff"));
+  } catch (error) {
+    if (toggleElement) toggleElement.checked = !toggleElement.checked;
+    toast(formatError(error, t("saveFailed")));
+  }
+}
+
+function renderReceivedCards() {
+  const device = getCurrentDevice();
+  const cards = device ? (state.receivedCardsByDevice[device.id] || []) : [];
+  view.innerHTML = `
+    <div class="panel">
+      <h2>${t("navReceived")}</h2>
+      <div class="actions">
+        <button id="syncCardsBtn" class="primary-btn" type="button">${t("syncFromDevice")}</button>
+      </div>
+      <pre class="log" id="syncLog">${t("waitingSync")}</pre>
+    </div>
+    <div class="grid">${cards.map((card) => `
+      <article class="card">
+        <h2>${escapeHtml(card.description || card.title || t("card"))}</h2>
+        <p class="muted">${escapeHtml(card.receivedAt || "")} · ${escapeHtml(card.sourceMac || "")}</p>
+        <pre class="log">${escapeHtml(card.detail || "")}</pre>
+      </article>
+    `).join("") || `<div class="empty">${t("noReceivedCards")}</div>`}</div>
+  `;
+  $("#syncCardsBtn").addEventListener("click", async () => {
+    if (!device) return toast(t("noDevice"));
+    try {
+      const result = await ble.syncReceivedCards((message) => $("#syncLog").textContent = message);
+      state.receivedCardsByDevice[device.id] = result.cards;
+      saveState();
+      toast(t("syncedCards", { count: result.cards.length }));
+      render();
+    } catch (error) {
+      $("#syncLog").textContent = formatError(error, t("syncFailed"));
+      toast(formatError(error, t("syncFailed")));
+    }
+  });
+}
+
+function renderFirmware() {
+  const deviceBeforeUpdate = getCurrentDevice();
+  view.innerHTML = `
+    <div class="panel form">
+      <h2>${t("firmwareUpgrade")}</h2>
+      <p class="muted">${t("firmwareHelp")}</p>
+      <div class="actions">
+        <button id="pickFirmwareBtn" class="primary-btn" type="button">${t("pickFirmware")}</button>
+      </div>
+      <div class="progress"><span id="firmwareProgress"></span></div>
+      <pre id="firmwareLog" class="log">${t("waitingFirmware")}</pre>
+    </div>
+  `;
+  $("#pickFirmwareBtn").addEventListener("click", () => {
+    filePicker.accept = ".bin,.fw,.ota,.pkg";
+    filePicker.onchange = async () => {
+      const file = filePicker.files[0];
+      if (!file) return;
+      try {
+        $("#firmwareProgress").style.width = "0%";
+        $("#firmwareLog").textContent = t("firmwareReady", { name: file.name, size: formatBytes(file.size) });
+        if (!confirm(t("confirmFirmwareUpdate"))) return;
+        state = { ...state, firmwareBusy: true, currentRoute: "firmware" };
+        saveState();
+        renderNav();
+        await ble.transferFirmwarePackage(file, ({ percent, message }) => {
+          $("#firmwareProgress").style.width = `${percent}%`;
+          $("#firmwareLog").textContent = message;
+        });
+        $("#firmwareProgress").style.width = "100%";
+        $("#firmwareLog").textContent = t("firmwareReconnectHint");
+        toast(t("firmwareTransferred"));
+        await verifyFirmwareAfterUpdate(deviceBeforeUpdate);
+      } catch (error) {
+        $("#firmwareLog").textContent = formatError(error, t("firmwareTransferFailed"));
+        toast(formatError(error, t("firmwareTransferFailed")));
+      } finally {
+        state = { ...state, firmwareBusy: false };
+        saveState();
+        renderNav();
+        filePicker.value = "";
+      }
+    };
+    filePicker.click();
+  });
+}
+
+async function verifyFirmwareAfterUpdate(deviceBeforeUpdate) {
+  await sleep(10000);
+  const target = deviceBeforeUpdate || getCurrentDevice() || {};
+  for (let attempt = 1; attempt <= 60; attempt += 1) {
+    const log = $("#firmwareLog");
+    if (log) log.textContent = t("firmwareVerifying", { count: attempt });
+    try {
+      if (!ble.device || !ble.device.gatt.connected) await ble.connectGranted(target);
+      const summary = await ble.readSummary(target);
+      upsertDevice({ ...target, ...summary, connected: true, statusLabel: t("online") });
+      const version = summary.firmwareVersion || "--";
+      const nextLog = $("#firmwareLog");
+      if (nextLog) nextLog.textContent = t("firmwareVerified", { version });
+      toast(t("firmwareVerified", { version }));
+      return summary;
+    } catch (error) {
+      await sleep(3000);
+    }
+  }
+  const log = $("#firmwareLog");
+  if (log) log.textContent = t("firmwareVerifyFailed");
+  toast(t("firmwareVerifyFailed"));
+  return null;
+}
+
+function renderAppSettings() {
+  view.innerHTML = `
+    <div class="split">
+      <div class="panel form">
+        <h2>${t("webSettings")}</h2>
+        <div class="field">
+          <label>${t("language")}</label>
+          <select id="settingsLanguageSelect">
+            <option value="auto" ${(state.localeMode || "auto") === "auto" ? "selected" : ""}>${t("autoLanguage")}</option>
+            <option value="zh-Hant" ${state.localeMode === "zh-Hant" ? "selected" : ""}>${localeNames["zh-Hant"]}</option>
+            <option value="en" ${state.localeMode === "en" ? "selected" : ""}>${localeNames.en}</option>
+            <option value="ja" ${state.localeMode === "ja" ? "selected" : ""}>${localeNames.ja}</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>${t("transferDelay")}</label>
+          <input id="transferDelay" type="number" min="0" max="100" value="${Number(state.appSettings.transferChunkDelay) || 0}">
+          <span class="muted">${t("transferDelayHelp")}</span>
+        </div>
+        <div class="actions">
+          <button id="saveAppSettingsBtn" class="primary-btn" type="button">${t("saveSettings")}</button>
+          <button id="exportStateBtn" class="secondary-btn" type="button">${t("exportData")}</button>
+          <button id="resetStateBtn" class="danger-btn" type="button">${t("clearData")}</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>${t("migrationNotes")}</h2>
+        <p class="muted">${t("migrationHelp")}</p>
+      </div>
+    </div>
+  `;
+  $("#settingsLanguageSelect").addEventListener("change", (event) => setLocaleMode(event.target.value));
+  $("#saveAppSettingsBtn").addEventListener("click", () => {
+    state.appSettings.transferChunkDelay = Number($("#transferDelay").value) || 0;
+    saveState();
+    toast(t("settingsSaved"));
+  });
+  $("#exportStateBtn").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "monicard-web-state.json";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  });
+  $("#resetStateBtn").addEventListener("click", () => {
+    if (!confirm(t("confirmClear"))) return;
+    state = initialState();
+    saveState();
+    toast(t("dataCleared"));
+    render();
+  });
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;"
+  })[char]);
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value).replace(/`/g, "&#096;");
+}
+
+async function loadTagCategories() {
+  try {
+    const response = await fetch("../utils/tag-categories.js");
+    const source = await response.text();
+    const module = { exports: [] };
+    Function("module", "exports", source)(module, module.exports);
+    if (Array.isArray(module.exports)) {
+      state.tagCategories = module.exports;
+      saveState();
+    }
+  } catch {
+    state.tagCategories = [{ name: t("category"), tags: ["VIP", "Match", "Event"] }];
+  }
+}
+
+$("#connectBtn").addEventListener("click", connectFlow);
+$("#disconnectBtn").addEventListener("click", async () => {
+  await ble.disconnect();
+  const current = getCurrentDevice();
+  if (current) updateDevice(current.id, { connected: false, statusLabel: t("disconnected") });
+  toast(t("disconnected"));
+  render();
+});
+
+loadTagCategories().then(render);
