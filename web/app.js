@@ -2897,15 +2897,20 @@ function renderDeviceSettings() {
   });
   view.querySelectorAll("[data-setting]").forEach((input) => {
     input.addEventListener("change", async () => {
+      const previousChecked = !input.checked;
+      input.disabled = true;
       const next = { ...state.deviceSettings, [input.dataset.setting]: !input.checked };
       try {
         const saved = await ble.writeControlSettings(next);
         state.deviceSettings = saved;
         saveState();
+        applyDeviceSettingsToSwitches(saved);
         toast(t("settingsSynced"));
       } catch (error) {
-        input.checked = !input.checked;
+        input.checked = previousChecked;
         toast(formatError(error, t("syncFailed")));
+      } finally {
+        input.disabled = false;
       }
     });
   });
@@ -2916,6 +2921,8 @@ function renderDeviceSettings() {
       const device = getCurrentDevice();
       if (device) updateDevice(device.id, { carouselDuration: seconds });
       toast(t("carouselRead"));
+      const status = $("#settingsStatus");
+      if (status) status.textContent = t("carouselRead");
     } catch (error) {
       toast(formatError(error, t("readFailed")));
     }
@@ -2937,17 +2944,29 @@ async function readSettingsAndCarousel(options = {}) {
     const status = $("#settingsStatus");
     if (status) status.textContent = t("autoReadingSettings");
     state.deviceSettings = await ble.readControlSettings();
+    applyDeviceSettingsToSwitches(state.deviceSettings);
     const seconds = await ble.readCarousel().catch(() => Number(getCurrentDevice()?.carouselDuration) || 0);
     const device = getCurrentDevice();
     if (device) updateDevice(device.id, { carouselDuration: seconds, connected: true, statusLabel: t("online") });
     saveState();
     if (options.notify) toast(t("settingsRead"));
-    render();
+    const input = $("#carouselInput");
+    const toggle = $("#carouselToggle");
+    if (input) input.value = seconds;
+    if (toggle) toggle.checked = seconds > 0;
+    if (status) status.textContent = t("settingsRead");
   } catch (error) {
     if (options.notify) toast(formatError(error, t("readFailed")));
     const status = $("#settingsStatus");
     if (status) status.textContent = formatError(error, t("readFailed"));
   }
+}
+
+function applyDeviceSettingsToSwitches(settings) {
+  view.querySelectorAll("[data-setting]").forEach((input) => {
+    if (input.disabled) return;
+    input.checked = !settings[input.dataset.setting];
+  });
 }
 
 async function saveCarouselSeconds(seconds, toggleElement) {
