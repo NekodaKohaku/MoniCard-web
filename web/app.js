@@ -173,7 +173,7 @@ const i18n = {
     autoReadSkipped: "連接設備後會自動讀取設定",
     syncFromDevice: "從設備同步",
     waitingSync: "等待同步",
-    noReceivedCards: "暫無收到的名片。",
+    noReceivedCards: "尚未收到名片。",
     firmwareUpgrade: "韌體升級",
     firmwareHelp: "請選擇可信任的韌體更新檔，並確認設備電量充足後再開始。更新完成並重新連線前，請停留在此頁面。",
     pickFirmware: "選擇韌體檔",
@@ -517,7 +517,7 @@ const i18n = {
     autoReadSkipped: "デバイス接続後、設定を自動で読み込みます",
     syncFromDevice: "デバイスから同期",
     waitingSync: "同期待ち",
-    noReceivedCards: "受信カードはまだありません。",
+    noReceivedCards: "まだ受信したカードはありません。",
     firmwareUpgrade: "ファームウェア更新",
     firmwareHelp: "信頼できるファームウェア更新ファイルを選び、デバイスのバッテリー残量を確認してから開始してください。更新後の再接続が完了するまで、このページを開いたままにしてください。",
     pickFirmware: "ファームウェアファイルを選択",
@@ -3009,7 +3009,7 @@ function renderReceivedCards() {
       const result = await ble.syncReceivedCards((message) => $("#syncLog").textContent = message);
       state.receivedCardsByDevice[device.id] = result.cards;
       saveState();
-      toast(t("syncedCards", { count: result.cards.length }));
+      toast(result.cards.length ? t("syncedCards", { count: result.cards.length }) : t("noReceivedCards"));
       render();
     } catch (error) {
       $("#syncLog").textContent = formatError(error, t("syncFailed"));
