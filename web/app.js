@@ -200,9 +200,16 @@ const i18n = {
     noTagResults: "找不到符合的標籤",
     addToList: "加入列表",
     clearAllTags: "清除所有標籤",
+    readDeviceTags: "讀取設備標籤",
     writeToDevice: "寫入設備",
     tagHint: "最多 5 個標籤，點擊標籤可移除。",
     tagsCleared: "已清除標籤列表",
+    readingDeviceTags: "正在讀取設備標籤，請保持設備開機並靠近電腦。",
+    tagsRead: "已讀取 {count} 個設備標籤",
+    tagsReadEmpty: "設備目前沒有標籤",
+    tagReadUnsupported: "此瀏覽器不支援讀取當前標籤；仍可手動選擇並寫入標籤。",
+    tagReadFailed: "讀取設備標籤失敗",
+    tagsWrittenHint: "標籤已寫入設備，稍等 1～2 秒後廣播會生效。",
     deviceSwitches: "設備開關",
     readSettings: "讀取設備設定",
     buzzer: "蜂鳴器",
@@ -224,7 +231,9 @@ const i18n = {
     saveCarousel: "儲存輪播",
     autoReadingSettings: "正在自動讀取設備設定",
     autoReadSkipped: "連接設備後會自動讀取設定",
+    autoRefreshingDevice: "正在自動同步設備狀態",
     syncFromDevice: "從設備同步",
+    autoSyncReceivedCards: "正在自動同步收到的名片",
     waitingSync: "等待同步",
     noReceivedCards: "尚未收到名片。",
     deleteReceivedCard: "刪除",
@@ -421,9 +430,16 @@ const i18n = {
     noTagResults: "No matching tags",
     addToList: "Add",
     clearAllTags: "Clear all tags",
+    readDeviceTags: "Read device tags",
     writeToDevice: "Write to device",
     tagHint: "Up to 5 tags. Click a tag to remove it.",
     tagsCleared: "Tag list cleared",
+    readingDeviceTags: "Reading device tags. Keep the device powered on and near this computer.",
+    tagsRead: "Read {count} device tags",
+    tagsReadEmpty: "No tags are currently set on the device",
+    tagReadUnsupported: "This browser cannot read the current tags. You can still select and write tags manually.",
+    tagReadFailed: "Couldn’t read device tags",
+    tagsWrittenHint: "Tags written. The broadcast should update in 1-2 seconds.",
     deviceSwitches: "Device Settings",
     readSettings: "Read device settings",
     buzzer: "Buzzer",
@@ -445,7 +461,9 @@ const i18n = {
     saveCarousel: "Save carousel",
     autoReadingSettings: "Reading device settings automatically",
     autoReadSkipped: "Settings will be read automatically after a device is connected",
+    autoRefreshingDevice: "Refreshing device status automatically",
     syncFromDevice: "Sync from device",
+    autoSyncReceivedCards: "Syncing received cards automatically",
     waitingSync: "Waiting to sync",
     noReceivedCards: "No received cards yet.",
     deleteReceivedCard: "Delete",
@@ -642,9 +660,16 @@ const i18n = {
     noTagResults: "一致するタグがありません",
     addToList: "追加",
     clearAllTags: "すべてのタグを削除",
+    readDeviceTags: "端末のタグを読み込み",
     writeToDevice: "端末に書き込み",
     tagHint: "タグは最大 5 個です。タグをクリックすると削除できます。",
     tagsCleared: "タグ一覧をクリアしました",
+    readingDeviceTags: "端末のタグを読み込んでいます。端末の電源を入れ、PCの近くに置いてください。",
+    tagsRead: "端末のタグを {count} 個読み込みました",
+    tagsReadEmpty: "端末にタグは設定されていません",
+    tagReadUnsupported: "このブラウザでは現在のタグを読み取れません。手動でタグを選択して書き込むことはできます。",
+    tagReadFailed: "端末のタグを読み込めませんでした",
+    tagsWrittenHint: "タグを書き込みました。1～2秒後に発信内容へ反映されます。",
     deviceSwitches: "端末設定",
     readSettings: "設定を読み込み",
     buzzer: "ブザー",
@@ -666,7 +691,9 @@ const i18n = {
     saveCarousel: "保存",
     autoReadingSettings: "端末設定を自動で読み込んでいます",
     autoReadSkipped: "端末接続後、設定を自動で読み込みます",
+    autoRefreshingDevice: "端末状態を自動で同期しています",
     syncFromDevice: "端末から同期",
+    autoSyncReceivedCards: "受け取った名刺を自動で同期しています",
     waitingSync: "同期待ち",
     noReceivedCards: "まだ受け取った名刺はありません。",
     deleteReceivedCard: "削除",
@@ -1179,6 +1206,21 @@ function tagOptionEntries(categories, categoryIndex, query) {
   }).slice(0, 200);
 }
 
+function resolveTagPayload(categories, payload) {
+  const catIndex = categories.findIndex((category, index) => categoryId(category, index) === Number(payload?.category));
+  const category = catIndex >= 0 ? categories[catIndex] : null;
+  const tagIndex = category && Array.isArray(category.tags)
+    ? category.tags.findIndex((tag, index) => tagId(tag, index) === Number(payload?.tagId))
+    : -1;
+  const tag = category && tagIndex >= 0 ? category.tags[tagIndex] : null;
+  return {
+    category: Number(payload?.category) || 0,
+    tagId: Number(payload?.tagId) || 0,
+    categoryName: category ? category.name : `${t("category")} ${Number(payload?.category) || 0}`,
+    tagName: tag ? tagDisplayName(tag) : `${t("tag")} ${Number(payload?.tagId) || 0}`
+  };
+}
+
 const routes = [
   ["devices", "navDevices", renderDevices],
   ["detail", "navDetail", renderDetail],
@@ -1236,6 +1278,9 @@ const initialState = () => ({
 let state = loadState();
 let activeTransferAbort = false;
 let toastTimer = null;
+let lastRenderedRoute = "";
+let receivedCardsSyncing = false;
+let detailAutoRefreshing = false;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -1801,6 +1846,67 @@ class MoniCardWebBluetooth {
     return this.connectDevice(target);
   }
 
+  async readTagsFromAdvertisement(savedDevice = {}, options = {}) {
+    if (!navigator.bluetooth?.requestLEScan) throw new Error("BLE_ADVERTISEMENT_UNSUPPORTED");
+    const timeout = Number(options.timeout) || 6500;
+    const expectedCount = Number.isInteger(Number(options.expectedCount)) ? Number(options.expectedCount) : -1;
+    return new Promise(async (resolve, reject) => {
+      let scan = null;
+      let settled = false;
+      let bestMatch = null;
+      const finish = (callback) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        navigator.bluetooth.removeEventListener("advertisementreceived", handleAdvertisement);
+        try {
+          scan?.stop();
+        } catch {
+          // Some browser builds throw after an already-stopped scan.
+        }
+        callback();
+      };
+      const matchesDevice = (event) => {
+        if (savedDevice?.bleDeviceId && event.device?.id === savedDevice.bleDeviceId) return true;
+        return /monicard/i.test(`${event.device?.name || ""} ${event.name || ""}`);
+      };
+      const handleAdvertisement = (event) => {
+        if (!matchesDevice(event)) return;
+        const parsed = parseAdvertisementTags(event);
+        const result = {
+          bleDeviceId: event.device?.id || "",
+          name: event.device?.name || event.name || "MoniCard",
+          found: Boolean(parsed.found),
+          count: parsed.count || 0,
+          tags: parsed.tags || [],
+          expectedCount,
+          matchesExpectedCount: expectedCount < 0 || parsed.count === expectedCount
+        };
+        if (result.found) {
+          bestMatch = result;
+          if (expectedCount >= 0 && result.matchesExpectedCount) finish(() => resolve(result));
+        } else if (!bestMatch) {
+          bestMatch = result;
+        }
+      };
+      const timer = setTimeout(() => {
+        finish(() => {
+          if (bestMatch) resolve(bestMatch);
+          else reject(new Error("未讀取到設備標籤廣播"));
+        });
+      }, timeout);
+      try {
+        navigator.bluetooth.addEventListener("advertisementreceived", handleAdvertisement);
+        scan = await navigator.bluetooth.requestLEScan({
+          filters: [{ namePrefix: "MoniCard" }, ...SERVICE_UUIDS.map((service) => ({ services: [service] }))],
+          keepRepeatedDevices: true
+        });
+      } catch (error) {
+        finish(() => reject(error));
+      }
+    });
+  }
+
   async disconnect() {
     this.pending.splice(0).forEach((item) => {
       clearTimeout(item.timer);
@@ -2128,6 +2234,39 @@ function parseReceivedCard(data) {
     detail,
     receivedAt
   };
+}
+
+function dataViewBytes(view) {
+  if (!view) return new Uint8Array();
+  return new Uint8Array(view.buffer, view.byteOffset || 0, view.byteLength || view.buffer?.byteLength || 0);
+}
+
+function parseTagPayloadBytes(bytes) {
+  const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+  for (let offset = 0; offset < data.length - 1; offset += 1) {
+    if (data[offset] !== 1) continue;
+    const count = data[offset + 1];
+    if (count > TAGS_MAX_COUNT || offset + 2 + count * 3 > data.length) continue;
+    const tags = [];
+    let cursor = offset + 2;
+    for (let index = 0; index < count; index += 1) {
+      tags.push({ category: data[cursor], tagId: readUint16(data, cursor + 1) });
+      cursor += 3;
+    }
+    return { found: true, count, tags };
+  }
+  return null;
+}
+
+function parseAdvertisementTags(event) {
+  const candidates = [];
+  event?.manufacturerData?.forEach((value) => candidates.push(dataViewBytes(value)));
+  event?.serviceData?.forEach((value) => candidates.push(dataViewBytes(value)));
+  for (const bytes of candidates) {
+    const parsed = parseTagPayloadBytes(bytes);
+    if (parsed) return parsed;
+  }
+  return { found: false, count: 0, tags: [] };
 }
 
 function receivedCardKey(card) {
@@ -2925,7 +3064,7 @@ async function connectFlow() {
   }
 }
 
-async function refreshCurrentDevice(silent = false) {
+async function refreshCurrentDevice(silent = false, options = {}) {
   const current = getCurrentDevice();
   if (!current) return toast(t("noDevice"));
   try {
@@ -2935,7 +3074,7 @@ async function refreshCurrentDevice(silent = false) {
     if (!silent) toast(t("deviceUpdated"));
     render();
   } catch (error) {
-    toast(formatError(error, t("updateFailed")));
+    if (!options.quietErrors) toast(formatError(error, t("updateFailed")));
   }
 }
 
@@ -2961,6 +3100,7 @@ async function connectKnownDevice(deviceId) {
 function render() {
   try {
     const route = routes.find(([key]) => key === state.currentRoute) || routes[0];
+    const enteringRoute = lastRenderedRoute !== route[0];
     document.documentElement.lang = currentLocale();
     document.title = t("appTitle");
     $("#brandName").textContent = t("brandName");
@@ -2972,7 +3112,8 @@ function render() {
     $("#eyebrow").textContent = ble.connection ? t("eyebrowConnected") : t("eyebrowWeb");
     renderNav();
     renderSupport();
-    route[2]();
+    route[2]({ enteringRoute });
+    lastRenderedRoute = route[0];
   } catch (error) {
     showRenderError(error);
   }
@@ -3103,7 +3244,7 @@ function deviceCard(device) {
   `;
 }
 
-function renderDetail() {
+function renderDetail(options = {}) {
   const device = getCurrentDevice();
   if (!device) {
     view.innerHTML = `<div class="empty">${t("noDeviceSelected")}</div>`;
@@ -3124,6 +3265,7 @@ function renderDetail() {
           <button id="refreshDeviceBtn" class="primary-btn" type="button">${t("refreshDeviceStatus")}</button>
           <button id="renameDeviceBtn" class="secondary-btn" type="button">${t("saveName")}</button>
         </div>
+        <p id="detailStatus" class="muted">${options.enteringRoute && (ble.connection || device.bleDeviceId) ? t("autoRefreshingDevice") : ""}</p>
         <div class="field" style="margin-top:14px">
           <label>${t("deviceName")}</label>
           <input id="deviceNameInput" value="${escapeAttr(device.name || "")}">
@@ -3147,13 +3289,25 @@ function renderDetail() {
   view.querySelectorAll("[data-feature]").forEach((button) => {
     button.addEventListener("click", () => setState({ currentRoute: button.dataset.feature }));
   });
+  if (options.enteringRoute && !detailAutoRefreshing && (ble.connection || device.bleDeviceId)) {
+    detailAutoRefreshing = true;
+    setTimeout(async () => {
+      try {
+        await refreshCurrentDevice(true, { quietErrors: true });
+      } finally {
+        detailAutoRefreshing = false;
+        const status = $("#detailStatus");
+        if (status) status.textContent = "";
+      }
+    }, 0);
+  }
 }
 
 function featureButton(key, title, desc) {
   return `<button class="feature-btn" data-feature="${key}" type="button"><strong>${title}</strong><span>${desc}</span></button>`;
 }
 
-function renderCard() {
+function renderCard(options = {}) {
   const device = getCurrentDevice();
   const text = device?.cardPreview || t("defaultCard");
   view.innerHTML = `
@@ -3206,7 +3360,7 @@ function renderCard() {
       toast(formatError(error, t("uploadFailed")));
     }
   });
-  bindReceivedCards();
+  bindReceivedCards({ autoSync: options.enteringRoute });
 }
 
 function renderMedia() {
@@ -3594,9 +3748,11 @@ function renderTags() {
       <div class="actions">
         <button id="addTagBtn" class="secondary-btn" type="button">${t("addToList")}</button>
         <button id="clearTagsBtn" class="danger-btn" type="button">${t("clearAllTags")}</button>
+        <button id="readTagsBtn" class="secondary-btn" type="button">${t("readDeviceTags")}</button>
         <button id="writeTagsBtn" class="primary-btn" type="button">${t("writeToDevice")}</button>
       </div>
       <div class="tag-list" id="draftTags"></div>
+      <pre class="log" id="tagStatus">${t("tagHint")}</pre>
     </div>
   `;
   const drafts = [];
@@ -3637,10 +3793,51 @@ function renderTags() {
   $("#clearTagsBtn").addEventListener("click", () => {
     drafts.splice(0, drafts.length);
     renderDrafts();
+    $("#tagStatus").textContent = t("tagsCleared");
     toast(t("tagsCleared"));
+  });
+  $("#readTagsBtn").addEventListener("click", async () => {
+    if (!device) return toast(t("noDevice"));
+    const button = $("#readTagsBtn");
+    button.disabled = true;
+    $("#tagStatus").textContent = t("readingDeviceTags");
+    try {
+      const result = await ble.readTagsFromAdvertisement(device);
+      if (!result.found) throw new Error("未讀取到設備標籤廣播");
+      const resolved = (result.tags || []).map((tag) => resolveTagPayload(categories, tag));
+      drafts.splice(0, drafts.length, ...resolved);
+      renderDrafts();
+      if (resolved[0]) {
+        updateDevice(device.id, {
+          tagCategory: resolved[0].categoryName,
+          tagName: resolved[0].tagName,
+          tagCategoryId: resolved[0].category,
+          tagId: resolved[0].tagId,
+          bleDeviceId: result.bleDeviceId || device.bleDeviceId
+        });
+      } else {
+        updateDevice(device.id, {
+          tagCategory: "",
+          tagName: "",
+          tagCategoryId: 0,
+          tagId: 0,
+          bleDeviceId: result.bleDeviceId || device.bleDeviceId
+        });
+      }
+      const message = resolved.length ? t("tagsRead", { count: resolved.length }) : t("tagsReadEmpty");
+      $("#tagStatus").textContent = message;
+      toast(message);
+    } catch (error) {
+      const message = error?.message === "BLE_ADVERTISEMENT_UNSUPPORTED" ? t("tagReadUnsupported") : formatError(error, t("tagReadFailed"));
+      $("#tagStatus").textContent = message;
+      toast(message);
+    } finally {
+      button.disabled = false;
+    }
   });
   $("#writeTagsBtn").addEventListener("click", async () => {
     try {
+      $("#tagStatus").textContent = t("writeToDevice");
       await ble.writeTags(drafts);
       if (device && drafts[0]) {
         updateDevice(device.id, {
@@ -3659,8 +3856,10 @@ function renderTags() {
           statusLabel: t("settingsSynced")
         });
       }
+      $("#tagStatus").textContent = t("tagsWrittenHint");
       toast(t("tagsWritten"));
     } catch (error) {
+      $("#tagStatus").textContent = formatError(error, t("writeFailed"));
       toast(formatError(error, t("writeFailed")));
     }
   });
@@ -3837,24 +4036,50 @@ function renderReceivedCards() {
   bindReceivedCards();
 }
 
-function bindReceivedCards() {
+async function syncReceivedCardsFromDevice(device, cachedCards, options = {}) {
+  if (!device || receivedCardsSyncing) return;
+  const log = $("#syncLog");
+  const syncButton = $("#syncCardsBtn");
+  receivedCardsSyncing = true;
+  if (syncButton) syncButton.disabled = true;
+  if (log && options.auto) log.textContent = t("autoSyncReceivedCards");
+  try {
+    if (!ble.device || !ble.device.gatt.connected) await ble.connectGranted(device);
+    const result = await ble.syncReceivedCards((message) => {
+      const currentLog = $("#syncLog");
+      if (currentLog) currentLog.textContent = message;
+    });
+    state.receivedCardsByDevice[device.id] = preserveReceivedCardTimes(result.cards, cachedCards);
+    saveState();
+    const message = state.receivedCardsByDevice[device.id].length ? t("syncedCards", { count: state.receivedCardsByDevice[device.id].length }) : t("noReceivedCards");
+    const currentLog = $("#syncLog");
+    if (currentLog) currentLog.textContent = message;
+    if (!options.auto) toast(message);
+    render();
+  } catch (error) {
+    const message = formatError(error, t("syncFailed"));
+    const currentLog = $("#syncLog");
+    if (currentLog) currentLog.textContent = message;
+    if (!options.quietErrors) toast(message);
+  } finally {
+    receivedCardsSyncing = false;
+    const currentButton = $("#syncCardsBtn");
+    if (currentButton) currentButton.disabled = false;
+  }
+}
+
+function bindReceivedCards(options = {}) {
   const device = getCurrentDevice();
   const cards = device ? (state.receivedCardsByDevice[device.id] || []) : [];
   const syncButton = $("#syncCardsBtn");
   if (!syncButton) return;
   $("#syncCardsBtn").addEventListener("click", async () => {
     if (!device) return toast(t("noDevice"));
-    try {
-      const result = await ble.syncReceivedCards((message) => $("#syncLog").textContent = message);
-      state.receivedCardsByDevice[device.id] = preserveReceivedCardTimes(result.cards, cards);
-      saveState();
-      toast(state.receivedCardsByDevice[device.id].length ? t("syncedCards", { count: state.receivedCardsByDevice[device.id].length }) : t("noReceivedCards"));
-      render();
-    } catch (error) {
-      $("#syncLog").textContent = formatError(error, t("syncFailed"));
-      toast(formatError(error, t("syncFailed")));
-    }
+    await syncReceivedCardsFromDevice(device, cards);
   });
+  if (options.autoSync && device && (ble.connection || device.bleDeviceId)) {
+    setTimeout(() => syncReceivedCardsFromDevice(device, cards, { auto: true, quietErrors: true }), 0);
+  }
   document.querySelectorAll("[data-delete-received-card]").forEach((button) => {
     button.addEventListener("click", async () => {
       if (!device) return toast(t("noDevice"));
