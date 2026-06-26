@@ -58,6 +58,8 @@ const SIFLI_OTA_COMMAND = {
 };
 const FILE_TYPE = { RESOURCE: 1, IP: 2, PURCHASE: 3, UI: 4 };
 const OTA_PACKAGE_PACKET_BYTES = 2048;
+const FIRMWARE_MIN_BYTES = 64 * 1024;
+const FIRMWARE_MAX_BYTES = 8 * 1024 * 1024;
 const CARD_INFO_MAX_BYTES = 319;
 const TAGS_MAX_COUNT = 5;
 const CONTROL_INFO_BYTES = 8;
@@ -207,7 +209,7 @@ const i18n = {
     readingDeviceTags: "正在讀取設備標籤，請保持設備開機並靠近電腦。",
     tagsRead: "已讀取 {count} 個設備標籤",
     tagsReadEmpty: "設備目前沒有標籤",
-    tagReadUnsupported: "此瀏覽器不支援讀取當前標籤；仍可手動選擇並寫入標籤。",
+    tagReadUnsupported: "此瀏覽器不支援讀取當前標籤設定；但仍可手動選擇並寫入覆蓋標籤設定。",
     tagReadFailed: "讀取設備標籤失敗",
     tagsWrittenHint: "標籤已寫入設備，稍等 1～2 秒後廣播會生效。",
     deviceSwitches: "設備開關",
@@ -245,12 +247,16 @@ const i18n = {
     pickFirmware: "選擇韌體檔",
     waitingFirmware: "等待選擇韌體檔",
     firmwareReady: "已讀取韌體檔：{name}\n大小：{size}\n更新期間請勿切換頁面、關閉瀏覽器、讓電腦睡眠，或中斷設備電源。",
+    firmwareOnlyBin: "韌體更新只接受官方 .bin 檔。",
+    firmwareTooSmall: "此檔案太小，不像有效的韌體檔。",
+    firmwareTooLarge: "此檔案太大，不像此設備的韌體檔。",
+    firmwareLooksWrong: "此檔案格式不像韌體檔，請確認你選的是官方 .bin 更新檔。",
     firmwareInstalling: "傳輸完成，設備正在校驗並安裝更新。",
     firmwareReconnectHint: "設備已收到更新。請等待約 10 秒後按電源鍵開機，並保持此頁面開啟直到自動重新連線完成。",
     firmwareVerifying: "正在嘗試重新連線並檢查更新結果…({count})",
     firmwareVerified: "設備已重新連線，韌體版本：{version}",
     firmwareVerifyFailed: "尚未自動重新連線。請確認設備已開機後，手動重新連線。",
-    confirmFirmwareUpdate: "確定要開始韌體更新？更新完成並重新連線前，請不要切換頁面、關閉瀏覽器、讓電腦睡眠，或中斷設備電源。",
+    confirmFirmwareUpdate: "確定要開始韌體更新？請只使用官方提供且對應此設備的 .bin 檔。錯誤韌體可能讓設備無法正常開機；更新完成並重新連線前，請不要切換頁面、關閉瀏覽器、讓電腦睡眠，或中斷設備電源。",
     webSettings: "網頁設定",
     language: "語言",
     transferDelay: "傳輸包間隔 ms",
@@ -438,7 +444,7 @@ const i18n = {
     readingDeviceTags: "Reading device tags. Keep the device powered on and near this computer.",
     tagsRead: "Read {count} device tags",
     tagsReadEmpty: "No tags are currently set on the device",
-    tagReadUnsupported: "This browser cannot read the current tags. You can still select and write tags manually.",
+    tagReadUnsupported: "This browser cannot read the current tag settings. You can still choose tags manually and overwrite the tag settings.",
     tagReadFailed: "Couldn’t read device tags",
     tagsWrittenHint: "Tags written. The broadcast should update in 1-2 seconds.",
     deviceSwitches: "Device Settings",
@@ -476,12 +482,16 @@ const i18n = {
     pickFirmware: "Choose firmware file",
     waitingFirmware: "Waiting for a firmware file",
     firmwareReady: "Firmware file loaded: {name}\nSize: {size}\nDo not switch pages, close the browser, let the computer sleep, or power off the device during the update.",
+    firmwareOnlyBin: "Firmware updates only accept official .bin files.",
+    firmwareTooSmall: "This file is too small to look like a valid firmware file.",
+    firmwareTooLarge: "This file is too large to look like firmware for this device.",
+    firmwareLooksWrong: "This file does not look like a firmware file. Choose the official .bin update file.",
     firmwareInstalling: "Upload complete. The device is verifying and installing the update.",
     firmwareReconnectHint: "The device has received the update. Wait about 10 seconds, press the power button, and keep this page open until automatic reconnection finishes.",
     firmwareVerifying: "Trying to reconnect and verify the update…({count})",
     firmwareVerified: "Device reconnected. Firmware version: {version}",
     firmwareVerifyFailed: "Automatic reconnection did not finish. Power on the device, then reconnect manually.",
-    confirmFirmwareUpdate: "Start the firmware update? Until the update reconnects, do not switch pages, close the browser, let the computer sleep, or power off the device.",
+    confirmFirmwareUpdate: "Start the firmware update? Use only the official .bin file for this exact device. The wrong firmware may prevent the device from booting. Until the update reconnects, do not switch pages, close the browser, let the computer sleep, or power off the device.",
     webSettings: "Web app settings",
     language: "Language",
     transferDelay: "Packet delay, ms",
@@ -669,7 +679,7 @@ const i18n = {
     readingDeviceTags: "端末のタグを読み込んでいます。端末の電源を入れ、PCの近くに置いてください。",
     tagsRead: "端末のタグを {count} 個読み込みました",
     tagsReadEmpty: "端末にタグは設定されていません",
-    tagReadUnsupported: "このブラウザでは現在のタグを読み取れません。手動でタグを選択して書き込むことはできます。",
+    tagReadUnsupported: "このブラウザでは現在のタグ設定を読み取れません。手動でタグを選択し、タグ設定を上書きできます。",
     tagReadFailed: "端末のタグを読み込めませんでした",
     tagsWrittenHint: "タグを書き込みました。1～2秒後に発信内容へ反映されます。",
     deviceSwitches: "端末設定",
@@ -707,12 +717,16 @@ const i18n = {
     pickFirmware: "ファームウェアファイルを選択",
     waitingFirmware: "ファームウェアファイルの選択待ち",
     firmwareReady: "ファームウェアファイルを読み込みました：{name}\nサイズ：{size}\n更新中はページを切り替えず、ブラウザを閉じず、PCをスリープさせず、端末の電源を切らないでください。",
+    firmwareOnlyBin: "ファームウェア更新は公式の .bin ファイルのみ対応しています。",
+    firmwareTooSmall: "このファイルは小さすぎるため、有効なファームウェアには見えません。",
+    firmwareTooLarge: "このファイルは大きすぎるため、この端末向けのファームウェアには見えません。",
+    firmwareLooksWrong: "このファイル形式はファームウェアには見えません。公式の .bin 更新ファイルを選択してください。",
     firmwareInstalling: "アップロードが完了しました。端末側で確認とインストールを行っています。",
     firmwareReconnectHint: "端末が更新を受け取りました。約10秒待ってから電源ボタンを押し、自動再接続が完了するまでこのページを開いたままにしてください。",
     firmwareVerifying: "再接続して更新結果を確認しています…({count})",
     firmwareVerified: "端末に再接続しました。ファームウェア：{version}",
     firmwareVerifyFailed: "自動再接続が完了しませんでした。端末の電源を入れてから手動で再接続してください。",
-    confirmFirmwareUpdate: "ファームウェア更新を開始しますか？更新後の再接続が完了するまで、ページを切り替えず、ブラウザを閉じず、PCをスリープさせず、端末の電源を切らないでください。",
+    confirmFirmwareUpdate: "ファームウェア更新を開始しますか？必ずこの端末に対応した公式の .bin ファイルだけを使用してください。誤ったファームウェアを使うと端末が正常に起動しなくなる可能性があります。更新後の再接続が完了するまで、ページを切り替えず、ブラウザを閉じず、PCをスリープさせず、端末の電源を切らないでください。",
     webSettings: "Web アプリ設定",
     language: "言語",
     transferDelay: "パケット間隔 ms",
@@ -1351,7 +1365,8 @@ function formatError(error, fallback = t("saveFailed")) {
 
 function localizeKnownErrorMessage(message) {
   if (/請先連接設備|请先连接设备|藍牙未連接|蓝牙未连接|no connection|not connected/i.test(message)) return t("errorNoConnection");
-  if (/Firmware|Device returned error|update|OTA|damaged|incompatible|does not match|empty/i.test(message)) return t("errorFirmwareFile");
+  if (/只接受|太小|太大|不像|official \.bin|too small|too large|does not look|小さすぎ|大きすぎ|公式.*\.bin|見えません/i.test(message)) return message;
+  if (/Firmware|firmware|韌體|ファームウェア|Device returned error|update|OTA|damaged|incompatible|does not match|empty|official \.bin|\.bin|too small|too large/i.test(message)) return t("errorFirmwareFile");
   if (/Unsupported media type/i.test(message)) return t("errorUnsupportedMedia");
   if (/GIF|Not a valid GIF|GIF file|GIF data|LZW|color table/i.test(message)) return t("errorInvalidGif");
   if (/Canvas export failed|No frames to encode|video|media/i.test(message)) return t("errorMediaEncode");
@@ -1603,6 +1618,30 @@ function crc32Mpeg2(bytes) {
     }
   }
   return crc >>> 0;
+}
+
+function looksLikeWrongFirmwareFile(bytes) {
+  if (!bytes || bytes.length < 16) return true;
+  const signature = Array.from(bytes.slice(0, 16)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  const ascii = textFromBytes(bytes.slice(0, 16)).toLowerCase();
+  return signature.startsWith("504b0304") ||
+    signature.startsWith("89504e47") ||
+    signature.startsWith("47494638") ||
+    signature.startsWith("25504446") ||
+    signature.startsWith("ffd8ff") ||
+    ascii.includes("<!doctype") ||
+    ascii.includes("<html") ||
+    ascii.includes("ftyp");
+}
+
+async function validateFirmwareFile(file) {
+  const name = String(file?.name || "");
+  if (!/\.bin$/i.test(name)) throw new Error(t("firmwareOnlyBin"));
+  if (!file || file.size <= 0) throw new Error("Firmware file is empty");
+  if (file.size < FIRMWARE_MIN_BYTES) throw new Error(t("firmwareTooSmall"));
+  if (file.size > FIRMWARE_MAX_BYTES) throw new Error(t("firmwareTooLarge"));
+  const header = new Uint8Array(await file.slice(0, 32).arrayBuffer());
+  if (looksLikeWrongFirmwareFile(header)) throw new Error(t("firmwareLooksWrong"));
 }
 
 function encodeOta(command, payload = new Uint8Array()) {
@@ -2125,6 +2164,7 @@ class MoniCardWebBluetooth {
   async transferFirmwarePackage(file, onProgress) {
     await this.ensureConnected();
     activeTransferAbort = false;
+    await validateFirmwareFile(file);
     const bytes = new Uint8Array(await file.arrayBuffer());
     if (!bytes.length) throw new Error("Firmware file is empty");
     const packetCount = Math.max(1, Math.ceil(bytes.length / OTA_PACKAGE_PACKET_BYTES));
@@ -4121,12 +4161,13 @@ function renderFirmware() {
     </div>
   `;
   $("#pickFirmwareBtn").addEventListener("click", () => {
-    filePicker.accept = ".bin,.fw,.ota,.pkg";
+    filePicker.accept = ".bin";
     filePicker.onchange = async () => {
       const file = filePicker.files[0];
       if (!file) return;
       try {
         $("#firmwareProgress").style.width = "0%";
+        await validateFirmwareFile(file);
         $("#firmwareLog").textContent = t("firmwareReady", { name: file.name, size: formatBytes(file.size) });
         if (!confirm(t("confirmFirmwareUpdate"))) return;
         state = { ...state, firmwareBusy: true, currentRoute: "firmware" };
