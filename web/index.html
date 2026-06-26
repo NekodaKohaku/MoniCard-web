@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#10151f">
     <title>MoniCard Web</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2310151f'/%3E%3Ccircle cx='32' cy='32' r='18' fill='%23fff04a'/%3E%3Cpath d='M23 34h18M27 25h10M27 43h10' stroke='%2310151f' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
-    <link rel="stylesheet" href="./styles.css?v=20260626-1">
+    <link rel="stylesheet" href="./styles.css?v=20260627-4">
   </head>
   <body>
     <div class="app-shell">
@@ -47,6 +47,49 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <input id="filePicker" type="file" hidden>
-    <script type="module" src="./app.js?v=20260626-1"></script>
+    <script type="module">
+      if (location.protocol === "file:") {
+        const view = document.querySelector("#view");
+        const pageTitle = document.querySelector("#pageTitle");
+        const supportTitle = document.querySelector("#supportTitle");
+        const supportText = document.querySelector("#supportText");
+        if (pageTitle) pageTitle.textContent = "MoniCard Web";
+        if (supportTitle) supportTitle.textContent = "請使用本地伺服器開啟";
+        if (supportText) supportText.textContent = "直接開啟 index.html 會讓瀏覽器擋住 app.js。";
+        if (view) {
+          view.innerHTML = `
+            <div class="panel">
+              <h2>請用 localhost 開啟</h2>
+              <p class="muted">請在專案資料夾執行本地伺服器，再用 Chrome 開啟 localhost 網址。</p>
+              <pre class="log">cd /Users/shironeko/Desktop/morica
+python3 -m http.server 5173
+
+然後開啟：
+http://localhost:5173/web/</pre>
+            </div>
+          `;
+        }
+      } else {
+      import("./app.js?v=20260627-4").catch((error) => {
+        console.error("App failed to load", error);
+        const view = document.querySelector("#view");
+        const pageTitle = document.querySelector("#pageTitle");
+        const supportTitle = document.querySelector("#supportTitle");
+        const supportText = document.querySelector("#supportText");
+        if (pageTitle) pageTitle.textContent = "MoniCard Web";
+        if (supportTitle) supportTitle.textContent = "畫面載入失敗";
+        if (supportText) supportText.textContent = "請重新整理，或把下方錯誤訊息傳給開發者。";
+        if (view) {
+          view.innerHTML = `<div class="panel"><h2>畫面載入失敗</h2><pre class="log">${String(error && (error.stack || error.message) || error).replace(/[&<>"']/g, (char) => ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#039;"
+          })[char])}</pre></div>`;
+        }
+      });
+      }
+    </script>
   </body>
 </html>

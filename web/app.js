@@ -65,7 +65,12 @@ const FILE_TRANSFER_FREE_MARGIN_BYTES = 50 * 1024;
 const RESERVED_STORAGE_BYTES = 3 * 1024 * 1024;
 const MOTION_MAX_DURATION_MS = 10000;
 const MOTION_MAX_FRAME_RATE = 20;
-const MOTION_JPEG_QUALITY = 26 / 30;
+const MEDIA_QUALITY_OPTIONS = {
+  high: { ratio: 26 / 30, label: "87%" },
+  balanced: { ratio: 0.7, label: "70%" },
+  compact: { ratio: 0.45, label: "45%" },
+  maximum: { ratio: 1, label: "100%" }
+};
 const STORAGE_KEY = "monicard-web-state-v1";
 const LOCALE_STORAGE_KEY = "monicard-web-locale";
 
@@ -87,7 +92,7 @@ const i18n = {
     navMedia: "素材",
     navTags: "標籤",
     navSettings: "設備設定",
-    navReceived: "收到的卡片",
+    navReceived: "收到的名片",
     navFirmware: "韌體",
     navAppSettings: "軟體設定",
     eyebrowConnected: "已連線",
@@ -100,9 +105,10 @@ const i18n = {
     bluetoothUnsupportedDesc: "目前瀏覽器不支援 Web Bluetooth",
     bluetoothSecureDesc: "請使用 localhost 或 HTTPS",
     devicesList: "設備列表",
-    connectNewDevice: "連線新設備",
     refreshCurrentDevice: "重新整理目前設備",
-    emptyDevices: "還沒有設備。點擊「連線新設備」，在瀏覽器彈窗中選擇你的 MoniCard。",
+    emptyDevices: "還沒有設備。請使用右上角「連線設備」選擇你的 MoniCard。",
+    connectKnownDevice: "連線",
+    reconnectFromCardFailed: "無法直接連線這台設備，請使用右上角「連線設備」重新選擇。",
     manage: "管理",
     remove: "移除",
     noDeviceSelected: "還沒有選擇設備。",
@@ -121,7 +127,7 @@ const i18n = {
     tagsFeatureDesc: "設定同好感應標籤",
     settingsFeature: "設備設定",
     settingsFeatureDesc: "燈光、震動、蜂鳴器",
-    receivedFeature: "收到的卡片",
+    receivedFeature: "收到的名片",
     receivedFeatureDesc: "同步附近設備名片",
     firmwareFeature: "韌體",
     firmwareFeatureDesc: "上傳本機更新檔",
@@ -135,11 +141,50 @@ const i18n = {
     defaultCard: "MoniCard\nQQ：12345678\n我是 Monica",
     mediaTransfer: "素材傳輸",
     mediaHelp: "上傳想在設備上顯示的照片、短影片或 GIF。",
-    mediaProcessHelp: "系統會自動調整尺寸與格式；影片與 GIF 會取前 10 秒製作成設備素材，建議使用直式 3:4 素材。",
+    mediaProcessHelp: "系統會自動調整尺寸與格式；影片與 GIF 會取前 10 秒製作成設備素材，建議使用直式 3:4 素材。品質越高，檔案越大、傳輸越久。",
+    mediaQuality: "素材品質",
+    mediaQualityHigh: "畫質優先（約 87%，預設）",
+    mediaQualityBalanced: "平衡（約 70%）",
+    mediaQualityCompact: "省空間（約 45%）",
+    mediaQualityMaximum: "最高品質（不建議，檔案較大）",
+    mediaQualityHelp: "只影響影片與 GIF 的畫質和檔案大小，不改變解析度與幀率。",
+    mediaLayout: "顯示方式",
+    mediaEditBeforeUpload: "上傳前編輯素材",
+    mediaEditBeforeUploadDesc: "開啟後可先預覽、拖曳裁切位置並加上文字。",
+    mediaLayoutCover: "裁切填滿畫面",
+    mediaLayoutContain: "完整顯示並留邊",
+    mediaAdjustments: "畫面微調",
+    mediaZoom: "縮放",
+    mediaOffsetX: "左右位置",
+    mediaOffsetY: "上下位置",
+    mediaCaption: "疊加文字",
+    mediaCaptionPlaceholder: "可留空，例如活動名稱或暱稱",
+    mediaTextStyle: "文字樣式",
+    mediaCaptionX: "文字左右位置",
+    mediaCaptionY: "文字上下位置",
+    mediaCaptionFont: "字型",
+    mediaCaptionCustomFont: "自訂字型名稱",
+    mediaCaptionCustomFontPlaceholder: "需為此裝置已安裝的字型",
+    mediaCaptionCustomFontHelp: "只有使用者電腦或手機已安裝的字型才會生效。",
+    mediaCaptionSize: "文字大小",
+    mediaCaptionColors: "文字顏色與背景",
+    mediaCaptionColor: "文字顏色",
+    mediaCaptionBackground: "文字背景",
+    mediaCaptionBackgroundOpacity: "背景透明度",
+    mediaCaptionWeight: "粗體",
+    mediaCaptionItalic: "斜體",
+    mediaCaptionDirection: "文字方向",
+    mediaCaptionHorizontal: "橫寫",
+    mediaCaptionVertical: "直寫",
     fileType: "素材類型",
     fileTypeHelp: "支援 JPG、PNG、WebP、常見影片格式與 GIF。",
     resourceFile: "圖片 / 影片 / GIF",
-    pickAndTransfer: "選擇檔案並傳輸",
+    pickAndTransfer: "選擇檔案",
+    uploadSelectedMedia: "上傳素材",
+    mediaPreview: "預覽",
+    mediaPreviewEmpty: "選擇圖片、影片或 GIF 後會在這裡預覽；可直接拖曳畫面調整位置",
+    mediaSelected: "已選擇素材：{name}",
+    mediaPreviewFailed: "無法產生預覽，仍可嘗試上傳。",
     cancelTransfer: "取消傳輸",
     waitingFile: "等待選擇檔案",
     dropMedia: "也可以把圖片、影片或 GIF 拖曳到這裡",
@@ -168,7 +213,7 @@ const i18n = {
     broadcast: "廣播",
     broadcastDesc: "允許設備廣播名片與標籤",
     videoCarousel: "影片輪播",
-    carouselSeconds: "間隔秒數，0 表示關閉",
+    carouselSeconds: "輪播間隔",
     carouselEnabled: "啟用輪播",
     readCarousel: "讀取輪播",
     saveCarousel: "儲存輪播",
@@ -272,9 +317,10 @@ const i18n = {
     bluetoothUnsupportedDesc: "This browser does not support Web Bluetooth",
     bluetoothSecureDesc: "Use localhost or HTTPS",
     devicesList: "Devices",
-    connectNewDevice: "Connect a device",
     refreshCurrentDevice: "Refresh current device",
-    emptyDevices: "No devices yet. Choose “Connect a device”, then select your MoniCard in the browser prompt.",
+    emptyDevices: "No devices yet. Use “Connect device” in the top right to choose your MoniCard.",
+    connectKnownDevice: "Connect",
+    reconnectFromCardFailed: "Could not connect to this saved device. Use “Connect device” in the top right and select it again.",
     manage: "Manage",
     remove: "Remove",
     noDeviceSelected: "No device selected yet.",
@@ -307,11 +353,50 @@ const i18n = {
     defaultCard: "MoniCard\nQQ: 12345678\nHi, I'm Monica.",
     mediaTransfer: "Asset upload",
     mediaHelp: "Upload images, videos, or GIFs to show on your device.",
-    mediaProcessHelp: "Files are automatically resized and prepared for the display. Videos and GIFs use the first 10 seconds. Portrait 3:4 assets work best.",
+    mediaProcessHelp: "Files are automatically resized and prepared for the display. Videos and GIFs use the first 10 seconds. Portrait 3:4 assets work best. Higher quality creates larger files and takes longer to upload.",
+    mediaQuality: "Asset quality",
+    mediaQualityHigh: "Quality first (about 87%, default)",
+    mediaQualityBalanced: "Balanced (about 70%)",
+    mediaQualityCompact: "Save space (about 45%)",
+    mediaQualityMaximum: "Maximum quality (not recommended, larger files)",
+    mediaQualityHelp: "Affects video and GIF quality and file size only. Resolution and frame rate stay the same.",
+    mediaLayout: "Display mode",
+    mediaEditBeforeUpload: "Edit before upload",
+    mediaEditBeforeUploadDesc: "Preview the asset, drag to adjust framing, and add text before uploading.",
+    mediaLayoutCover: "Fill screen by cropping",
+    mediaLayoutContain: "Show full image with padding",
+    mediaAdjustments: "Framing adjustments",
+    mediaZoom: "Zoom",
+    mediaOffsetX: "Horizontal position",
+    mediaOffsetY: "Vertical position",
+    mediaCaption: "Text overlay",
+    mediaCaptionPlaceholder: "Optional, such as an event name or nickname",
+    mediaTextStyle: "Text style",
+    mediaCaptionX: "Text horizontal position",
+    mediaCaptionY: "Text vertical position",
+    mediaCaptionFont: "Font",
+    mediaCaptionCustomFont: "Custom font name",
+    mediaCaptionCustomFontPlaceholder: "Must be installed on this device",
+    mediaCaptionCustomFontHelp: "This works only when the font is installed on the user's computer or phone.",
+    mediaCaptionSize: "Text size",
+    mediaCaptionColors: "Text color and background",
+    mediaCaptionColor: "Text color",
+    mediaCaptionBackground: "Text background",
+    mediaCaptionBackgroundOpacity: "Background opacity",
+    mediaCaptionWeight: "Bold",
+    mediaCaptionItalic: "Italic",
+    mediaCaptionDirection: "Text direction",
+    mediaCaptionHorizontal: "Horizontal",
+    mediaCaptionVertical: "Vertical",
     fileType: "Asset type",
     fileTypeHelp: "Supports JPG, PNG, WebP, common video formats, and GIF.",
     resourceFile: "Image / video / GIF",
-    pickAndTransfer: "Choose file and upload",
+    pickAndTransfer: "Choose file",
+    uploadSelectedMedia: "Upload asset",
+    mediaPreview: "Preview",
+    mediaPreviewEmpty: "Choose an image, video, or GIF to preview it here. Drag the preview to adjust framing.",
+    mediaSelected: "Selected asset: {name}",
+    mediaPreviewFailed: "Could not generate a preview. You can still try uploading it.",
     cancelTransfer: "Cancel upload",
     waitingFile: "Waiting for a file",
     dropMedia: "You can also drag an image, video, or GIF here",
@@ -340,7 +425,7 @@ const i18n = {
     broadcast: "Broadcast",
     broadcastDesc: "Allow the device to broadcast cards and tags",
     videoCarousel: "Video carousel",
-    carouselSeconds: "Interval in seconds. Use 0 to turn it off",
+    carouselSeconds: "Carousel interval",
     carouselEnabled: "Enable carousel",
     readCarousel: "Read carousel",
     saveCarousel: "Save carousel",
@@ -444,9 +529,10 @@ const i18n = {
     bluetoothUnsupportedDesc: "このブラウザは Web Bluetooth に対応していません",
     bluetoothSecureDesc: "localhost または HTTPS で開いてください",
     devicesList: "端末",
-    connectNewDevice: "端末を接続",
     refreshCurrentDevice: "端末状態を更新",
-    emptyDevices: "まだ端末がありません。「端末を接続」を押して、ブラウザの選択画面から MoniCard を選んでください。",
+    emptyDevices: "まだ端末がありません。右上の「端末を接続」から MoniCard を選択してください。",
+    connectKnownDevice: "接続",
+    reconnectFromCardFailed: "保存済み端末に直接接続できませんでした。右上の「端末を接続」から再度選択してください。",
     manage: "管理",
     remove: "削除",
     noDeviceSelected: "端末が選択されていません。",
@@ -479,11 +565,50 @@ const i18n = {
     defaultCard: "MoniCard\nQQ：12345678\nMonicaです",
     mediaTransfer: "素材アップロード",
     mediaHelp: "端末に表示したい画像、動画、GIFをアップロードできます。",
-    mediaProcessHelp: "表示に合わせてサイズと形式を自動調整します。動画とGIFは先頭10秒を端末用素材にします。縦長の3:4素材がおすすめです。",
+    mediaProcessHelp: "表示に合わせてサイズと形式を自動調整します。動画とGIFは先頭10秒を端末用素材にします。縦長の3:4素材がおすすめです。品質を上げるほどファイルサイズが大きくなり、アップロード時間も長くなります。",
+    mediaQuality: "素材品質",
+    mediaQualityHigh: "画質優先（約87%、初期設定）",
+    mediaQualityBalanced: "バランス（約70%）",
+    mediaQualityCompact: "容量優先（約45%）",
+    mediaQualityMaximum: "最高品質（非推奨、ファイルサイズ大）",
+    mediaQualityHelp: "動画とGIFの画質とファイルサイズにのみ影響します。解像度とフレームレートは変わりません。",
+    mediaLayout: "表示方法",
+    mediaEditBeforeUpload: "アップロード前に編集",
+    mediaEditBeforeUploadDesc: "アップロード前にプレビュー、ドラッグで位置調整、文字入れができます。",
+    mediaLayoutCover: "画面いっぱいに切り抜く",
+    mediaLayoutContain: "全体を表示して余白を入れる",
+    mediaAdjustments: "表示位置の調整",
+    mediaZoom: "拡大率",
+    mediaOffsetX: "左右位置",
+    mediaOffsetY: "上下位置",
+    mediaCaption: "文字を重ねる",
+    mediaCaptionPlaceholder: "任意：イベント名やニックネームなど",
+    mediaTextStyle: "文字スタイル",
+    mediaCaptionX: "文字の左右位置",
+    mediaCaptionY: "文字の上下位置",
+    mediaCaptionFont: "フォント",
+    mediaCaptionCustomFont: "カスタムフォント名",
+    mediaCaptionCustomFontPlaceholder: "この端末にインストール済みのフォント名",
+    mediaCaptionCustomFontHelp: "ユーザーのPCやスマートフォンにインストールされているフォントのみ有効です。",
+    mediaCaptionSize: "文字サイズ",
+    mediaCaptionColors: "文字色と背景",
+    mediaCaptionColor: "文字色",
+    mediaCaptionBackground: "文字背景",
+    mediaCaptionBackgroundOpacity: "背景の透明度",
+    mediaCaptionWeight: "太字",
+    mediaCaptionItalic: "斜体",
+    mediaCaptionDirection: "文字方向",
+    mediaCaptionHorizontal: "横書き",
+    mediaCaptionVertical: "縦書き",
     fileType: "素材種別",
     fileTypeHelp: "JPG、PNG、WebP、主要な動画形式、GIFに対応しています。",
     resourceFile: "画像 / 動画 / GIF",
-    pickAndTransfer: "ファイルを選んでアップロード",
+    pickAndTransfer: "ファイルを選択",
+    uploadSelectedMedia: "素材をアップロード",
+    mediaPreview: "プレビュー",
+    mediaPreviewEmpty: "画像、動画、GIFを選ぶとここにプレビューが表示されます。プレビューをドラッグして位置を調整できます。",
+    mediaSelected: "選択中の素材：{name}",
+    mediaPreviewFailed: "プレビューを作成できませんでした。アップロードは試行できます。",
     cancelTransfer: "アップロードをキャンセル",
     waitingFile: "ファイルの選択待ち",
     dropMedia: "画像、動画、GIFをここにドラッグして選択できます",
@@ -512,7 +637,7 @@ const i18n = {
     broadcast: "名刺・タグ発信",
     broadcastDesc: "名刺とタグの発信を許可",
     videoCarousel: "動画カルーセル",
-    carouselSeconds: "切替間隔（秒）。0 でオフ",
+    carouselSeconds: "切替間隔",
     carouselEnabled: "カルーセルを有効にする",
     readCarousel: "設定を読み込み",
     saveCarousel: "保存",
@@ -604,7 +729,8 @@ const localeNames = {
 
 function readStoredValue(key, fallback = null) {
   try {
-    return localStorage.getItem(key) ?? fallback;
+    const value = localStorage.getItem(key);
+    return value === null || value === undefined ? fallback : value;
   } catch {
     return fallback;
   }
@@ -1026,7 +1152,28 @@ const initialState = () => ({
     disableAmbienceLight: false,
     controlInfoBytes: [1, 1, 1, 1, 1, 0, 0, 1]
   },
-  appSettings: { transferChunkDelay: 8 },
+  appSettings: {
+    transferChunkDelay: 8,
+    mediaEditBeforeUpload: false,
+    mediaQuality: "high",
+    mediaLayout: "cover",
+    mediaZoom: 100,
+    mediaOffsetX: 0,
+    mediaOffsetY: 0,
+    mediaCaption: "",
+    mediaCaptionX: 50,
+    mediaCaptionY: 82,
+    mediaCaptionSize: 18,
+    mediaCaptionColor: "#ffffff",
+    mediaCaptionBackgroundEnabled: true,
+    mediaCaptionBackgroundColor: "#000000",
+    mediaCaptionBackgroundOpacity: 58,
+    mediaCaptionFont: "system",
+    mediaCaptionCustomFont: "",
+    mediaCaptionBold: true,
+    mediaCaptionItalic: false,
+    mediaCaptionDirection: "horizontal"
+  },
   firmwareBusy: false,
   localeMode: readStoredValue(LOCALE_STORAGE_KEY, "auto"),
   locale: detectLocale(),
@@ -1044,20 +1191,39 @@ function clone(value) {
 function loadState() {
   try {
     const cached = JSON.parse(readStoredValue(STORAGE_KEY, "null") || "null");
-    return { ...initialState(), ...(cached || {}), firmwareBusy: false };
+    const base = initialState();
+    const loaded = {
+      ...base,
+      ...(cached || {}),
+      appSettings: { ...base.appSettings, ...((cached || {}).appSettings || {}) },
+      firmwareBusy: false
+    };
+    loaded.devices = Array.isArray(loaded.devices) ? loaded.devices.map((device) => ({ ...device, connected: false })) : [];
+    return loaded;
   } catch {
     return initialState();
   }
 }
 
 function saveState() {
-  writeStoredValue(STORAGE_KEY, JSON.stringify(state));
+  const storedState = {
+    ...state,
+    devices: state.devices.map((device) => ({ ...device, connected: false }))
+  };
+  writeStoredValue(STORAGE_KEY, JSON.stringify(storedState));
 }
 
 function setState(patch) {
   state = { ...state, ...patch };
   saveState();
   render();
+}
+
+function ensureAppSettings() {
+  const defaults = initialState().appSettings;
+  if (!state.appSettings || typeof state.appSettings !== "object") state.appSettings = {};
+  state.appSettings = { ...defaults, ...state.appSettings };
+  return state.appSettings;
 }
 
 function toast(message) {
@@ -1094,6 +1260,13 @@ function getCurrentDevice() {
   return state.devices.find((item) => item.id === state.currentDeviceId || item.sn === state.currentDeviceId) || state.devices[0] || null;
 }
 
+function isDeviceLive(device) {
+  if (!device || !ble.device || !ble.device.gatt || !ble.device.gatt.connected) return false;
+  if (ble.connection?.bleDeviceId && device.bleDeviceId && ble.connection.bleDeviceId === device.bleDeviceId) return true;
+  if (state.currentDeviceId && (device.id === state.currentDeviceId || device.sn === state.currentDeviceId)) return true;
+  return false;
+}
+
 function upsertDevice(device) {
   const normalized = {
     id: device.sn || device.id || `web-${Date.now()}`,
@@ -1104,9 +1277,9 @@ function upsertDevice(device) {
     usedStorageLabel: device.usedStorageLabel || "--",
     totalStorageLabel: device.totalStorageLabel || "--",
     storagePercent: Number(device.storagePercent) || 0,
-    statusLabel: device.statusLabel || t("online"),
+    statusLabel: device.statusLabel || t("disconnected"),
     signalStrength: device.signalStrength || 0,
-    connected: Boolean(device.connected),
+    connected: false,
     firmwareVersion: device.firmwareVersion || "--",
     latestFirmwareVersion: device.latestFirmwareVersion || "--",
     cardPreview: device.cardPreview || "",
@@ -1779,7 +1952,7 @@ class MoniCardWebBluetooth {
       if (activeTransferAbort) throw new Error("傳輸已取消");
       ensureFileOk(await this.file(encodeFileSendData(block, chunks[block]), FILE_COMMAND.FILE_SEND_DATA_RESPONSE, 12000), "檔案分包寫入失敗");
       onProgress?.(Math.min(100, 20 + Math.round(((block + 1) / chunks.length) * 72)));
-      await sleep(Number(state.appSettings.transferChunkDelay) || 0);
+      await sleep(Number(ensureAppSettings().transferChunkDelay) || 0);
     }
     ensureFileOk(await this.file(encodeFileSendEnd(), FILE_COMMAND.FILE_SEND_END_RESPONSE, 12000), "檔案結束確認失敗");
     ensureFileOk(await this.file(encodeFileTransferEnd(), FILE_COMMAND.END_RESPONSE, 12000), "檔案總結束確認失敗");
@@ -1815,7 +1988,7 @@ class MoniCardWebBluetooth {
       }
       const percent = 8 + Math.round((packetIndex / packetCount) * 84);
       onProgress?.({ percent, message: t("firmwareProgress", { percent }) });
-      await sleep(Number(state.appSettings.transferChunkDelay) || 0);
+      await sleep(Number(ensureAppSettings().transferChunkDelay) || 0);
     }
     onProgress?.({ percent: 94, message: t("firmwareInstalling") });
     const end = await this.ota(encodeOtaPackageEnd(), SIFLI_OTA_COMMAND.IMAGE_PACKAGE_END_RESPONSE, 180000);
@@ -1948,7 +2121,11 @@ function makeCanvas(width = 240, height = 320) {
   return canvas;
 }
 
-function drawCover(ctx, source, sourceWidth, sourceHeight, width = 240, height = 320) {
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, Number(value) || 0));
+}
+
+function drawCover(ctx, source, sourceWidth, sourceHeight, width = 240, height = 320, options = {}) {
   const sourceRatio = sourceWidth / sourceHeight;
   const targetRatio = width / height;
   let sx = 0;
@@ -1962,8 +2139,151 @@ function drawCover(ctx, source, sourceWidth, sourceHeight, width = 240, height =
     sh = sourceWidth / targetRatio;
     sy = (sourceHeight - sh) / 2;
   }
+  const zoom = clamp(options.zoom || 100, 100, 240) / 100;
+  const cropW = Math.max(1, sw / zoom);
+  const cropH = Math.max(1, sh / zoom);
+  const maxX = Math.max(0, sourceWidth - cropW);
+  const maxY = Math.max(0, sourceHeight - cropH);
+  sx = clamp(sx + (clamp(options.offsetX, -100, 100) / 100) * maxX / 2, 0, maxX);
+  sy = clamp(sy + (clamp(options.offsetY, -100, 100) / 100) * maxY / 2, 0, maxY);
   ctx.clearRect(0, 0, width, height);
-  ctx.drawImage(source, sx, sy, sw, sh, 0, 0, width, height);
+  ctx.drawImage(source, sx, sy, cropW, cropH, 0, 0, width, height);
+}
+
+function drawContain(ctx, source, sourceWidth, sourceHeight, width = 240, height = 320, options = {}) {
+  const scale = Math.min(width / sourceWidth, height / sourceHeight) * (clamp(options.zoom || 100, 80, 240) / 100);
+  const dw = Math.max(1, Math.round(sourceWidth * scale));
+  const dh = Math.max(1, Math.round(sourceHeight * scale));
+  const freeX = Math.max(0, width - dw);
+  const freeY = Math.max(0, height - dh);
+  const overflowX = Math.max(0, dw - width);
+  const overflowY = Math.max(0, dh - height);
+  const dx = Math.round((width - dw) / 2 + (clamp(options.offsetX, -100, 100) / 100) * (freeX + overflowX) / 2);
+  const dy = Math.round((height - dh) / 2 + (clamp(options.offsetY, -100, 100) / 100) * (freeY + overflowY) / 2);
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(source, 0, 0, sourceWidth, sourceHeight, dx, dy, dw, dh);
+}
+
+function mediaProcessingOptions(forceEditing = false) {
+  const settings = ensureAppSettings();
+  const useEditing = forceEditing || Boolean(settings.mediaEditBeforeUpload);
+  if (!useEditing) {
+    return {
+      layout: "cover",
+      zoom: 100,
+      offsetX: 0,
+      offsetY: 0,
+      caption: ""
+    };
+  }
+  return {
+    layout: settings.mediaLayout === "contain" ? "contain" : "cover",
+    zoom: clamp(settings.mediaZoom || 100, settings.mediaLayout === "contain" ? 80 : 100, 240),
+    offsetX: clamp(settings.mediaOffsetX, -100, 100),
+    offsetY: clamp(settings.mediaOffsetY, -100, 100),
+    caption: String(settings.mediaCaption || "").trim().slice(0, 48),
+    captionX: clamp(settings.mediaCaptionX || 50, 8, 92),
+    captionY: clamp(settings.mediaCaptionY || 82, 8, 92),
+    captionSize: clamp(settings.mediaCaptionSize || 18, 10, 42),
+    captionColor: normalizeHexColor(settings.mediaCaptionColor, "#ffffff"),
+    captionBackgroundEnabled: settings.mediaCaptionBackgroundEnabled !== false,
+    captionBackgroundColor: normalizeHexColor(settings.mediaCaptionBackgroundColor, "#000000"),
+    captionBackgroundOpacity: clamp(settings.mediaCaptionBackgroundOpacity ?? 58, 0, 100),
+    captionFont: ["system", "serif", "mono", "custom"].includes(settings.mediaCaptionFont) ? settings.mediaCaptionFont : "system",
+    captionCustomFont: String(settings.mediaCaptionCustomFont || "").trim().slice(0, 80),
+    captionBold: settings.mediaCaptionBold !== false,
+    captionItalic: Boolean(settings.mediaCaptionItalic),
+    captionDirection: settings.mediaCaptionDirection === "vertical" ? "vertical" : "horizontal"
+  };
+}
+
+function mediaMotionQuality() {
+  const key = ensureAppSettings().mediaQuality || "high";
+  return MEDIA_QUALITY_OPTIONS[key] || MEDIA_QUALITY_OPTIONS.high;
+}
+
+function quoteFontName(name) {
+  return `"${String(name || "").replace(/["\\]/g, "\\$&")}"`;
+}
+
+function normalizeHexColor(value, fallback) {
+  const text = String(value || "").trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(text)) return text;
+  if (/^#[0-9a-fA-F]{3}$/.test(text)) return `#${text[1]}${text[1]}${text[2]}${text[2]}${text[3]}${text[3]}`;
+  return fallback;
+}
+
+function hexToRgba(hex, opacityPercent = 100) {
+  const color = normalizeHexColor(hex, "#000000").slice(1);
+  const red = parseInt(color.slice(0, 2), 16);
+  const green = parseInt(color.slice(2, 4), 16);
+  const blue = parseInt(color.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${clamp(opacityPercent, 0, 100) / 100})`;
+}
+
+function captionFontFamily(font, customFont = "") {
+  if (font === "custom" && customFont) return `${quoteFontName(customFont)}, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
+  if (font === "serif") return "Georgia, 'Times New Roman', serif";
+  if (font === "mono") return "ui-monospace, SFMono-Regular, Menlo, monospace";
+  return "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+}
+
+function drawMediaCaption(ctx, caption, options = {}, width = 240, height = 320) {
+  if (!caption) return;
+  ctx.save();
+  const style = options.captionItalic ? "italic " : "";
+  const weight = options.captionBold ? "700 " : "400 ";
+  const fontSize = clamp(options.captionSize || 18, 10, 42);
+  ctx.font = `${style}${weight}${fontSize}px ${captionFontFamily(options.captionFont, options.captionCustomFont)}`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const normalized = caption.split(/\s+/).join(" ");
+  const matchedLines = normalized.match(/.{1,14}/g);
+  const lines = matchedLines ? matchedLines.slice(0, 2) : [caption.slice(0, 14)];
+  const lineHeight = Math.round(fontSize * 1.22);
+  const centerX = width * (clamp(options.captionX || 50, 8, 92) / 100);
+  const centerY = height * (clamp(options.captionY || 82, 8, 92) / 100);
+  ctx.shadowColor = "rgba(0, 0, 0, 0.65)";
+  ctx.shadowBlur = 3;
+  if (options.captionDirection === "vertical") {
+    const chars = Array.from(normalized.replace(/\s+/g, "")).slice(0, 8);
+    const boxWidth = Math.round(fontSize + 18);
+    const boxHeight = 14 + chars.length * lineHeight;
+    const x = clamp(centerX - boxWidth / 2, 8, width - boxWidth - 8);
+    const y = clamp(centerY - boxHeight / 2, 8, height - boxHeight - 8);
+    ctx.shadowBlur = 0;
+    if (options.captionBackgroundEnabled) {
+      ctx.fillStyle = hexToRgba(options.captionBackgroundColor, options.captionBackgroundOpacity);
+      ctx.fillRect(x, y, boxWidth, boxHeight);
+    }
+    ctx.fillStyle = options.captionColor || "#fff";
+    ctx.shadowBlur = 3;
+    const firstCharY = y + boxHeight / 2 - (chars.length - 1) * lineHeight / 2;
+    chars.forEach((char, index) => ctx.fillText(char, x + boxWidth / 2, firstCharY + index * lineHeight));
+  } else {
+    const textWidth = Math.min(width - 24, Math.max(...lines.map((line) => ctx.measureText(line).width)) + 24);
+    const boxHeight = 14 + lines.length * lineHeight;
+    const x = clamp(centerX - textWidth / 2, 8, width - textWidth - 8);
+    const y = clamp(centerY - boxHeight / 2, 8, height - boxHeight - 8);
+    ctx.shadowBlur = 0;
+    if (options.captionBackgroundEnabled) {
+      ctx.fillStyle = hexToRgba(options.captionBackgroundColor, options.captionBackgroundOpacity);
+      ctx.fillRect(x, y, textWidth, boxHeight);
+    }
+    ctx.fillStyle = options.captionColor || "#fff";
+    ctx.shadowBlur = 3;
+    const firstLineY = y + boxHeight / 2 - (lines.length - 1) * lineHeight / 2;
+    lines.forEach((line, index) => ctx.fillText(line, x + textWidth / 2, firstLineY + index * lineHeight));
+  }
+  ctx.restore();
+}
+
+function drawPreparedFrame(ctx, source, sourceWidth, sourceHeight, options = {}, width = 240, height = 320) {
+  if (options.layout === "contain") drawContain(ctx, source, sourceWidth, sourceHeight, width, height, options);
+  else drawCover(ctx, source, sourceWidth, sourceHeight, width, height, options);
+  drawMediaCaption(ctx, options.caption, options, width, height);
 }
 
 function loadImageFromFile(file) {
@@ -1985,7 +2305,7 @@ function loadImageFromFile(file) {
 async function prepareImageMedia(file) {
   const image = await loadImageFromFile(file);
   const canvas = makeCanvas(240, 320);
-  drawCover(canvas.getContext("2d"), image, image.naturalWidth || image.width, image.naturalHeight || image.height);
+  drawPreparedFrame(canvas.getContext("2d"), image, image.naturalWidth || image.width, image.naturalHeight || image.height, mediaProcessingOptions());
   const blob = await canvasToBlob(canvas, "image/png");
   return {
     bytes: await blobToBytes(blob),
@@ -2116,17 +2436,19 @@ async function prepareVideoMedia(file) {
     const frameRate = MOTION_MAX_FRAME_RATE;
     const frameCount = Math.max(1, Math.ceil(duration * frameRate));
     const frames = [];
+    const options = mediaProcessingOptions();
+    const quality = mediaMotionQuality();
     for (let index = 0; index < frameCount; index += 1) {
       await seekVideo(video, frameCount === 1 ? 0 : Math.min(duration - 0.01, index / frameRate));
-      drawCover(ctx, video, video.videoWidth || 240, video.videoHeight || 320);
-      frames.push(await blobToBytes(await canvasToBlob(canvas, "image/jpeg", MOTION_JPEG_QUALITY)));
+      drawPreparedFrame(ctx, video, video.videoWidth || 240, video.videoHeight || 320, options);
+      frames.push(await blobToBytes(await canvasToBlob(canvas, "image/jpeg", quality.ratio)));
     }
     const clipped = sourceDurationMs > MOTION_MAX_DURATION_MS;
     return {
       bytes: buildMjpegMp4(frames, { frameRate, width: 240, height: 320 }),
       fileName: motionResourceFileName(),
       kind: "motion",
-      label: `240x320 MJPEG MP4 · ${frameRate} fps · ${frameCount} frames${clipped ? " · first 10s" : ""}`
+      label: `240x320 MJPEG MP4 · ${frameRate} fps · ${frameCount} frames · quality ${quality.label}${clipped ? " · first 10s" : ""}`
     };
   } finally {
     URL.revokeObjectURL(url);
@@ -2446,18 +2768,52 @@ async function prepareGifMedia(file) {
   const ctx = canvas.getContext("2d");
   const sample = sampleGifFrames(gif);
   const frames = [];
+  const options = mediaProcessingOptions();
+  const quality = mediaMotionQuality();
   for (const frame of sample.frames) {
     sourceCtx.putImageData(new ImageData(frame.rgba, gif.width, gif.height), 0, 0);
-    drawCover(ctx, sourceCanvas, gif.width, gif.height);
-    frames.push(await blobToBytes(await canvasToBlob(canvas, "image/jpeg", MOTION_JPEG_QUALITY)));
+    drawPreparedFrame(ctx, sourceCanvas, gif.width, gif.height, options);
+    frames.push(await blobToBytes(await canvasToBlob(canvas, "image/jpeg", quality.ratio)));
   }
   const clipped = (gif.totalDurationMs || 0) > MOTION_MAX_DURATION_MS;
   return {
     bytes: buildMjpegMp4(frames, { frameRate: sample.frameRate, width: 240, height: 320 }),
     fileName: motionResourceFileName(),
     kind: "motion",
-    label: `240x320 MJPEG MP4 · GIF · ${sample.frameRate} fps · ${frames.length} frames${clipped ? " · first 10s" : ""}`
+    label: `240x320 MJPEG MP4 · GIF · ${sample.frameRate} fps · ${frames.length} frames · quality ${quality.label}${clipped ? " · first 10s" : ""}`
   };
+}
+
+async function renderMediaPreview(file, canvas) {
+  if (!file || !canvas) return;
+  const ctx = canvas.getContext("2d");
+  const type = String(file.type || "").toLowerCase();
+  const name = String(file.name || "").toLowerCase();
+  const options = mediaProcessingOptions(true);
+  if (type.includes("gif") || name.endsWith(".gif")) {
+    const gif = parseGifBytes(await file.arrayBuffer());
+    const frame = gif.frames[0];
+    const sourceCanvas = makeCanvas(gif.width, gif.height);
+    sourceCanvas.getContext("2d").putImageData(new ImageData(frame.rgba, gif.width, gif.height), 0, 0);
+    drawPreparedFrame(ctx, sourceCanvas, gif.width, gif.height, options);
+    return;
+  }
+  if (type.startsWith("video/")) {
+    const { video, url } = await loadVideoFromFile(file);
+    try {
+      await seekVideo(video, 0);
+      drawPreparedFrame(ctx, video, video.videoWidth || 240, video.videoHeight || 320, options);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+    return;
+  }
+  if (type.startsWith("image/")) {
+    const image = await loadImageFromFile(file);
+    drawPreparedFrame(ctx, image, image.naturalWidth || image.width, image.naturalHeight || image.height, options);
+    return;
+  }
+  throw new Error("Unsupported media type");
 }
 
 async function prepareMediaFile(file) {
@@ -2467,6 +2823,12 @@ async function prepareMediaFile(file) {
   if (type.startsWith("video/")) return prepareVideoMedia(file);
   if (type.startsWith("image/")) return prepareImageMedia(file);
   throw new Error("Unsupported media type");
+}
+
+function isMotionMediaFile(file) {
+  const type = String(file?.type || "").toLowerCase();
+  const name = String(file?.name || "").toLowerCase();
+  return type.startsWith("video/") || type.includes("gif") || name.endsWith(".gif");
 }
 
 function titleFromCard(text) {
@@ -2504,20 +2866,67 @@ async function refreshCurrentDevice(silent = false) {
   }
 }
 
+async function connectKnownDevice(deviceId) {
+  const device = state.devices.find((item) => item.id === deviceId || item.sn === deviceId);
+  if (!device) return toast(t("noDevice"));
+  try {
+    state.currentDeviceId = device.id;
+    saveState();
+    setBanner(t("chooseDeviceBanner"));
+    await ble.connectGranted(device);
+    const summary = await ble.readSummary(device);
+    upsertDevice({ ...device, ...summary, connected: true, statusLabel: t("online") });
+    setBanner("");
+    toast(t("connectedToast"));
+    setState({ currentRoute: "detail" });
+  } catch (error) {
+    setBanner("");
+    toast(formatError(error, t("reconnectFromCardFailed")));
+  }
+}
+
 function render() {
-  const route = routes.find(([key]) => key === state.currentRoute) || routes[0];
-  document.documentElement.lang = currentLocale();
-  document.title = t("appTitle");
-  $("#brandName").textContent = t("brandName");
-  $("#connectBtn").textContent = t("connectDevice");
-  $("#disconnectBtn").textContent = t("disconnect");
-  $("#disconnectBtn").title = t("disconnect");
-  renderLanguageSelect();
-  $("#pageTitle").textContent = t(route[1]);
-  $("#eyebrow").textContent = ble.connection ? t("eyebrowConnected") : t("eyebrowWeb");
-  renderNav();
-  renderSupport();
-  route[2]();
+  try {
+    const route = routes.find(([key]) => key === state.currentRoute) || routes[0];
+    document.documentElement.lang = currentLocale();
+    document.title = t("appTitle");
+    $("#brandName").textContent = t("brandName");
+    $("#connectBtn").textContent = t("connectDevice");
+    $("#disconnectBtn").textContent = t("disconnect");
+    $("#disconnectBtn").title = t("disconnect");
+    renderLanguageSelect();
+    $("#pageTitle").textContent = t(route[1]);
+    $("#eyebrow").textContent = ble.connection ? t("eyebrowConnected") : t("eyebrowWeb");
+    renderNav();
+    renderSupport();
+    route[2]();
+  } catch (error) {
+    showRenderError(error);
+  }
+}
+
+function showRenderError(error) {
+  console.error("Render failed", error);
+  const message = error && (error.stack || error.message) ? String(error.stack || error.message) : String(error);
+  const safeMessage = escapeHtml(message);
+  document.title = "MoniCard Web";
+  const pageTitle = $("#pageTitle");
+  const eyebrow = $("#eyebrow");
+  const supportTitle = $("#supportTitle");
+  const supportText = $("#supportText");
+  if (pageTitle) pageTitle.textContent = "MoniCard Web";
+  if (eyebrow) eyebrow.textContent = "App error";
+  if (supportTitle) supportTitle.textContent = "畫面初始化失敗";
+  if (supportText) supportText.textContent = "請重新整理，或把下方錯誤訊息傳給開發者。";
+  if (view) {
+    view.innerHTML = `
+      <div class="panel">
+        <h2>畫面初始化失敗</h2>
+        <p class="muted">請先重新整理頁面。如果持續發生，請把這段錯誤訊息傳給我。</p>
+        <pre class="log">${safeMessage}</pre>
+      </div>
+    `;
+  }
 }
 
 function renderNav() {
@@ -2570,16 +2979,17 @@ function renderDevices() {
     <div class="panel">
       <h2>${t("devicesList")}</h2>
       <div class="actions">
-        <button class="primary-btn" id="scanAddBtn" type="button">${t("connectNewDevice")}</button>
         <button class="secondary-btn" id="refreshKnownBtn" type="button">${t("refreshCurrentDevice")}</button>
       </div>
     </div>
     <div class="grid device-grid">${cards || `<div class="empty">${t("emptyDevices")}</div>`}</div>
   `;
-  $("#scanAddBtn").addEventListener("click", connectFlow);
   $("#refreshKnownBtn").addEventListener("click", () => refreshCurrentDevice());
-  view.querySelectorAll("[data-open-device]").forEach((button) => {
-    button.addEventListener("click", () => setState({ currentDeviceId: button.dataset.openDevice, currentRoute: "detail" }));
+  view.querySelectorAll("[data-manage-device]").forEach((button) => {
+    button.addEventListener("click", () => setState({ currentDeviceId: button.dataset.manageDevice, currentRoute: "detail" }));
+  });
+  view.querySelectorAll("[data-connect-device]").forEach((button) => {
+    button.addEventListener("click", () => connectKnownDevice(button.dataset.connectDevice));
   });
   view.querySelectorAll("[data-forget-device]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -2592,6 +3002,11 @@ function renderDevices() {
 }
 
 function deviceCard(device) {
+  const isLiveConnection = isDeviceLive(device);
+  const displayStatus = isLiveConnection ? t("online") : t("disconnected");
+  const primaryAction = isLiveConnection
+    ? `<button class="primary-btn" data-manage-device="${escapeAttr(device.id)}" type="button">${t("manage")}</button>`
+    : `<button class="primary-btn" data-connect-device="${escapeAttr(device.id)}" type="button">${t("connectKnownDevice")}</button>`;
   return `
     <article class="card device-card">
       <div class="device-head">
@@ -2599,7 +3014,7 @@ function deviceCard(device) {
           <div class="device-name">${escapeHtml(device.name || "MoniCard")}</div>
           <div class="muted">${escapeHtml(device.sn || device.id || "--")}</div>
         </div>
-        <span class="badge ${device.connected ? "" : "off"}">${escapeHtml(device.statusLabel || t("disconnected"))}</span>
+        <span class="badge ${isLiveConnection ? "" : "off"}">${escapeHtml(displayStatus)}</span>
       </div>
       <div class="stats">
         <div class="stat"><span>${t("battery")}</span><strong>${escapeHtml(String(device.battery ?? "--"))}%</strong></div>
@@ -2608,7 +3023,7 @@ function deviceCard(device) {
       </div>
       <div class="progress"><span style="width:${Math.max(0, Math.min(Number(device.storagePercent) || 0, 100))}%"></span></div>
       <div class="actions">
-        <button class="primary-btn" data-open-device="${escapeAttr(device.id)}" type="button">${t("manage")}</button>
+        ${primaryAction}
         <button class="danger-btn" data-forget-device="${escapeAttr(device.id)}" type="button">${t("remove")}</button>
       </div>
     </article>
@@ -2721,6 +3136,26 @@ function renderCard() {
 }
 
 function renderMedia() {
+  const settings = ensureAppSettings();
+  const mediaLayout = settings.mediaLayout === "contain" ? "contain" : "cover";
+  const mediaCaption = settings.mediaCaption || "";
+  const mediaZoom = clamp(settings.mediaZoom || 100, 80, 240);
+  const mediaOffsetX = clamp(settings.mediaOffsetX, -100, 100);
+  const mediaOffsetY = clamp(settings.mediaOffsetY, -100, 100);
+  const mediaCaptionX = clamp(settings.mediaCaptionX || 50, 8, 92);
+  const mediaCaptionY = clamp(settings.mediaCaptionY || 82, 8, 92);
+  const mediaCaptionSize = clamp(settings.mediaCaptionSize || 18, 10, 42);
+  const mediaCaptionColor = normalizeHexColor(settings.mediaCaptionColor, "#ffffff");
+  const mediaCaptionBackgroundEnabled = settings.mediaCaptionBackgroundEnabled !== false;
+  const mediaCaptionBackgroundColor = normalizeHexColor(settings.mediaCaptionBackgroundColor, "#000000");
+  const mediaCaptionBackgroundOpacity = clamp(settings.mediaCaptionBackgroundOpacity ?? 58, 0, 100);
+  const mediaCaptionFont = ["system", "serif", "mono", "custom"].includes(settings.mediaCaptionFont) ? settings.mediaCaptionFont : "system";
+  const mediaCaptionCustomFont = settings.mediaCaptionCustomFont || "";
+  const mediaCaptionBold = settings.mediaCaptionBold !== false;
+  const mediaCaptionItalic = Boolean(settings.mediaCaptionItalic);
+  const mediaCaptionDirection = settings.mediaCaptionDirection === "vertical" ? "vertical" : "horizontal";
+  const mediaQuality = MEDIA_QUALITY_OPTIONS[settings.mediaQuality] ? settings.mediaQuality : "high";
+  const editBeforeUpload = Boolean(settings.mediaEditBeforeUpload);
   view.innerHTML = `
     <div class="panel form">
       <h2>${t("mediaTransfer")}</h2>
@@ -2731,8 +3166,108 @@ function renderMedia() {
         <input value="${t("resourceFile")}" disabled>
         <span class="muted">${t("fileTypeHelp")}</span>
       </div>
+      <div class="field">
+        <label>${t("mediaQuality")}</label>
+        <select id="mediaQualitySelect">
+          <option value="high" ${mediaQuality === "high" ? "selected" : ""}>${t("mediaQualityHigh")}</option>
+          <option value="balanced" ${mediaQuality === "balanced" ? "selected" : ""}>${t("mediaQualityBalanced")}</option>
+          <option value="compact" ${mediaQuality === "compact" ? "selected" : ""}>${t("mediaQualityCompact")}</option>
+          <option value="maximum" ${mediaQuality === "maximum" ? "selected" : ""}>${t("mediaQualityMaximum")}</option>
+        </select>
+        <span class="muted">${t("mediaQualityHelp")}</span>
+      </div>
+      <label class="switch-row">
+        <span><strong>${t("mediaEditBeforeUpload")}</strong><br><span class="muted">${t("mediaEditBeforeUploadDesc")}</span></span>
+        <input id="mediaEditToggle" class="switch" type="checkbox" ${editBeforeUpload ? "checked" : ""}>
+      </label>
+      <div id="mediaEditor" class="${editBeforeUpload ? "" : "hidden"}">
+        <div class="field">
+          <label>${t("mediaLayout")}</label>
+          <select id="mediaLayoutSelect">
+            <option value="cover" ${mediaLayout === "cover" ? "selected" : ""}>${t("mediaLayoutCover")}</option>
+            <option value="contain" ${mediaLayout === "contain" ? "selected" : ""}>${t("mediaLayoutContain")}</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>${t("mediaAdjustments")}</label>
+          <div class="range-grid">
+            <span>${t("mediaZoom")}</span>
+            <input id="mediaZoomInput" type="range" min="80" max="240" value="${mediaZoom}">
+            <strong id="mediaZoomValue">${mediaZoom}%</strong>
+            <span>${t("mediaOffsetX")}</span>
+            <input id="mediaOffsetXInput" type="range" min="-100" max="100" value="${mediaOffsetX}">
+            <strong id="mediaOffsetXValue">${mediaOffsetX}</strong>
+            <span>${t("mediaOffsetY")}</span>
+            <input id="mediaOffsetYInput" type="range" min="-100" max="100" value="${mediaOffsetY}">
+            <strong id="mediaOffsetYValue">${mediaOffsetY}</strong>
+          </div>
+        </div>
+        <div class="field">
+          <label>${t("mediaCaption")}</label>
+          <input id="mediaCaptionInput" maxlength="48" value="${escapeAttr(mediaCaption)}" placeholder="${escapeAttr(t("mediaCaptionPlaceholder"))}">
+        </div>
+        <div class="field">
+          <label>${t("mediaTextStyle")}</label>
+          <div class="text-style-grid">
+            <select id="mediaCaptionFontSelect" aria-label="${escapeAttr(t("mediaCaptionFont"))}">
+              <option value="system" ${mediaCaptionFont === "system" ? "selected" : ""}>${t("mediaCaptionFont")}：System</option>
+              <option value="serif" ${mediaCaptionFont === "serif" ? "selected" : ""}>${t("mediaCaptionFont")}：Serif</option>
+              <option value="mono" ${mediaCaptionFont === "mono" ? "selected" : ""}>${t("mediaCaptionFont")}：Mono</option>
+              <option value="custom" ${mediaCaptionFont === "custom" ? "selected" : ""}>${t("mediaCaptionCustomFont")}</option>
+            </select>
+            <label class="check-pill"><input id="mediaCaptionBoldInput" type="checkbox" ${mediaCaptionBold ? "checked" : ""}>${t("mediaCaptionWeight")}</label>
+            <label class="check-pill"><input id="mediaCaptionItalicInput" type="checkbox" ${mediaCaptionItalic ? "checked" : ""}>${t("mediaCaptionItalic")}</label>
+            <select id="mediaCaptionDirectionSelect" aria-label="${escapeAttr(t("mediaCaptionDirection"))}">
+              <option value="horizontal" ${mediaCaptionDirection === "horizontal" ? "selected" : ""}>${t("mediaCaptionHorizontal")}</option>
+              <option value="vertical" ${mediaCaptionDirection === "vertical" ? "selected" : ""}>${t("mediaCaptionVertical")}</option>
+            </select>
+          </div>
+          <div class="range-grid compact nested-field">
+            <span>${t("mediaCaptionSize")}</span>
+            <input id="mediaCaptionSizeInput" type="range" min="10" max="42" value="${mediaCaptionSize}">
+            <strong id="mediaCaptionSizeValue">${mediaCaptionSize}px</strong>
+          </div>
+          <div id="mediaCustomFontField" class="field nested-field ${mediaCaptionFont === "custom" ? "" : "hidden"}">
+            <label>${t("mediaCaptionCustomFont")}</label>
+            <input id="mediaCaptionCustomFontInput" value="${escapeAttr(mediaCaptionCustomFont)}" placeholder="${escapeAttr(t("mediaCaptionCustomFontPlaceholder"))}">
+            <span class="muted">${t("mediaCaptionCustomFontHelp")}</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>${t("mediaCaptionColors")}</label>
+          <div class="text-style-grid">
+            <label class="color-field"><span>${t("mediaCaptionColor")}</span><input id="mediaCaptionColorInput" type="color" value="${escapeAttr(mediaCaptionColor)}"></label>
+            <label class="check-pill"><input id="mediaCaptionBackgroundInput" type="checkbox" ${mediaCaptionBackgroundEnabled ? "checked" : ""}>${t("mediaCaptionBackground")}</label>
+            <label class="color-field"><span>${t("mediaCaptionBackground")}</span><input id="mediaCaptionBackgroundColorInput" type="color" value="${escapeAttr(mediaCaptionBackgroundColor)}" ${mediaCaptionBackgroundEnabled ? "" : "disabled"}></label>
+          </div>
+          <div id="mediaCaptionBackgroundOpacityWrap" class="range-grid compact nested-field ${mediaCaptionBackgroundEnabled ? "" : "hidden"}">
+            <span>${t("mediaCaptionBackgroundOpacity")}</span>
+            <input id="mediaCaptionBackgroundOpacityInput" type="range" min="0" max="100" value="${mediaCaptionBackgroundOpacity}">
+            <strong id="mediaCaptionBackgroundOpacityValue">${mediaCaptionBackgroundOpacity}%</strong>
+          </div>
+        </div>
+        <div class="field">
+          <label>${t("mediaCaptionY")}</label>
+          <div class="range-grid">
+            <span>${t("mediaCaptionX")}</span>
+            <input id="mediaCaptionXInput" type="range" min="8" max="92" value="${mediaCaptionX}">
+            <strong id="mediaCaptionXValue">${mediaCaptionX}%</strong>
+            <span>${t("mediaCaptionY")}</span>
+            <input id="mediaCaptionYInput" type="range" min="8" max="92" value="${mediaCaptionY}">
+            <strong id="mediaCaptionYValue">${mediaCaptionY}%</strong>
+          </div>
+        </div>
+        <div class="field">
+          <label>${t("mediaPreview")}</label>
+          <div class="media-preview-wrap">
+            <canvas id="mediaPreviewCanvas" width="240" height="320"></canvas>
+            <span id="mediaPreviewEmpty">${t("mediaPreviewEmpty")}</span>
+          </div>
+        </div>
+      </div>
       <div class="actions">
         <button id="pickFileBtn" class="primary-btn" type="button">${t("pickAndTransfer")}</button>
+        <button id="uploadMediaBtn" class="secondary-btn ${editBeforeUpload ? "" : "hidden"}" type="button" disabled>${t("uploadSelectedMedia")}</button>
         <button id="cancelTransferBtn" class="danger-btn" type="button">${t("cancelTransfer")}</button>
       </div>
       <div id="mediaDropZone" class="drop-zone">${t("dropMedia")}</div>
@@ -2740,9 +3275,179 @@ function renderMedia() {
       <pre id="transferLog" class="log">${t("waitingFile")}</pre>
     </div>
   `;
+  let selectedMediaFile = null;
+  let previewToken = 0;
+  const isEditingMedia = () => Boolean(ensureAppSettings().mediaEditBeforeUpload);
+  const updatePreview = async () => {
+    const file = selectedMediaFile;
+    if (!file || !isEditingMedia()) return;
+    const token = ++previewToken;
+    try {
+      await renderMediaPreview(file, $("#mediaPreviewCanvas"));
+      if (token !== previewToken) return;
+      $("#mediaPreviewEmpty").classList.add("hidden");
+    } catch (error) {
+      if (token !== previewToken) return;
+      $("#mediaPreviewEmpty").textContent = t("mediaPreviewFailed");
+      $("#mediaPreviewEmpty").classList.remove("hidden");
+    }
+  };
+  const selectMediaFile = async (file) => {
+    if (!file) return;
+    selectedMediaFile = file;
+    $("#uploadMediaBtn").disabled = !isEditingMedia();
+    $("#transferLog").textContent = t("mediaSelected", { name: file.name || t("resourceFile") });
+    $("#transferProgress").style.width = "0%";
+    if (isEditingMedia()) {
+      $("#mediaPreviewEmpty").textContent = t("mediaPreviewEmpty");
+      $("#mediaPreviewEmpty").classList.remove("hidden");
+      await updatePreview();
+    } else {
+      await transferSelectedFile(file);
+    }
+  };
+  $("#mediaEditToggle").addEventListener("change", (event) => {
+    ensureAppSettings().mediaEditBeforeUpload = event.target.checked;
+    saveState();
+    $("#mediaEditor").classList.toggle("hidden", !event.target.checked);
+    $("#uploadMediaBtn").classList.toggle("hidden", !event.target.checked);
+    $("#uploadMediaBtn").disabled = !event.target.checked || !selectedMediaFile;
+    if (event.target.checked) updatePreview();
+  });
+  $("#mediaQualitySelect").addEventListener("change", (event) => {
+    ensureAppSettings().mediaQuality = MEDIA_QUALITY_OPTIONS[event.target.value] ? event.target.value : "high";
+    saveState();
+    updatePreview();
+  });
+  $("#mediaLayoutSelect").addEventListener("change", (event) => {
+    ensureAppSettings().mediaLayout = event.target.value === "contain" ? "contain" : "cover";
+    saveState();
+    updatePreview();
+  });
+  const bindRangeSetting = (inputId, valueId, key, suffix = "") => {
+    const input = $(`#${inputId}`);
+    const value = $(`#${valueId}`);
+    input.addEventListener("input", (event) => {
+      const next = Number(event.target.value) || 0;
+      ensureAppSettings()[key] = next;
+      value.textContent = `${next}${suffix}`;
+      saveState();
+      updatePreview();
+    });
+  };
+  const setMediaRangeSetting = (inputId, valueId, key, next, suffix = "", min = -100, max = 100) => {
+    const value = Math.round(clamp(next, min, max));
+    ensureAppSettings()[key] = value;
+    $(`#${inputId}`).value = value;
+    $(`#${valueId}`).textContent = `${value}${suffix}`;
+    saveState();
+  };
+  bindRangeSetting("mediaZoomInput", "mediaZoomValue", "mediaZoom", "%");
+  bindRangeSetting("mediaOffsetXInput", "mediaOffsetXValue", "mediaOffsetX");
+  bindRangeSetting("mediaOffsetYInput", "mediaOffsetYValue", "mediaOffsetY");
+  bindRangeSetting("mediaCaptionSizeInput", "mediaCaptionSizeValue", "mediaCaptionSize", "px");
+  bindRangeSetting("mediaCaptionXInput", "mediaCaptionXValue", "mediaCaptionX", "%");
+  bindRangeSetting("mediaCaptionYInput", "mediaCaptionYValue", "mediaCaptionY", "%");
+  bindRangeSetting("mediaCaptionBackgroundOpacityInput", "mediaCaptionBackgroundOpacityValue", "mediaCaptionBackgroundOpacity", "%");
+  $("#mediaCaptionInput").addEventListener("input", (event) => {
+    ensureAppSettings().mediaCaption = event.target.value.slice(0, 48);
+    saveState();
+    updatePreview();
+  });
+  $("#mediaCaptionFontSelect").addEventListener("change", (event) => {
+    ensureAppSettings().mediaCaptionFont = event.target.value;
+    $("#mediaCustomFontField").classList.toggle("hidden", event.target.value !== "custom");
+    saveState();
+    updatePreview();
+  });
+  $("#mediaCaptionCustomFontInput").addEventListener("input", (event) => {
+    ensureAppSettings().mediaCaptionCustomFont = event.target.value.slice(0, 80);
+    saveState();
+    updatePreview();
+  });
+  $("#mediaCaptionDirectionSelect").addEventListener("change", (event) => {
+    ensureAppSettings().mediaCaptionDirection = event.target.value === "vertical" ? "vertical" : "horizontal";
+    saveState();
+    updatePreview();
+  });
+  $("#mediaCaptionBoldInput").addEventListener("change", (event) => {
+    ensureAppSettings().mediaCaptionBold = event.target.checked;
+    saveState();
+    updatePreview();
+  });
+  $("#mediaCaptionItalicInput").addEventListener("change", (event) => {
+    ensureAppSettings().mediaCaptionItalic = event.target.checked;
+    saveState();
+    updatePreview();
+  });
+  $("#mediaCaptionColorInput").addEventListener("input", (event) => {
+    ensureAppSettings().mediaCaptionColor = normalizeHexColor(event.target.value, "#ffffff");
+    saveState();
+    updatePreview();
+  });
+  $("#mediaCaptionBackgroundColorInput").addEventListener("input", (event) => {
+    ensureAppSettings().mediaCaptionBackgroundColor = normalizeHexColor(event.target.value, "#000000");
+    saveState();
+    updatePreview();
+  });
+  $("#mediaCaptionBackgroundInput").addEventListener("change", (event) => {
+    ensureAppSettings().mediaCaptionBackgroundEnabled = event.target.checked;
+    $("#mediaCaptionBackgroundColorInput").disabled = !event.target.checked;
+    $("#mediaCaptionBackgroundOpacityWrap").classList.toggle("hidden", !event.target.checked);
+    saveState();
+    updatePreview();
+  });
+  const previewCanvas = $("#mediaPreviewCanvas");
+  let previewDrag = null;
+  previewCanvas.addEventListener("pointerdown", (event) => {
+    if (!selectedMediaFile || !isEditingMedia()) return;
+    const rect = previewCanvas.getBoundingClientRect();
+    const settings = ensureAppSettings();
+    const px = (event.clientX - rect.left) / Math.max(rect.width, 1) * 100;
+    const py = (event.clientY - rect.top) / Math.max(rect.height, 1) * 100;
+    const caption = String(settings.mediaCaption || "").trim();
+    const captionX = clamp(settings.mediaCaptionX || 50, 8, 92);
+    const captionY = clamp(settings.mediaCaptionY || 82, 8, 92);
+    const target = caption && Math.abs(px - captionX) <= 22 && Math.abs(py - captionY) <= 16 ? "caption" : "image";
+    previewCanvas.setPointerCapture?.(event.pointerId);
+    previewDrag = {
+      pointerId: event.pointerId,
+      target,
+      x: event.clientX,
+      y: event.clientY,
+      offsetX: Number(ensureAppSettings().mediaOffsetX) || 0,
+      offsetY: Number(ensureAppSettings().mediaOffsetY) || 0,
+      captionX,
+      captionY
+    };
+    previewCanvas.classList.add("dragging");
+  });
+  previewCanvas.addEventListener("pointermove", (event) => {
+    if (!previewDrag || previewDrag.pointerId !== event.pointerId) return;
+    const rect = previewCanvas.getBoundingClientRect();
+    const dx = event.clientX - previewDrag.x;
+    const dy = event.clientY - previewDrag.y;
+    if (previewDrag.target === "caption") {
+      setMediaRangeSetting("mediaCaptionXInput", "mediaCaptionXValue", "mediaCaptionX", previewDrag.captionX + dx / Math.max(rect.width, 1) * 100, "%", 8, 92);
+      setMediaRangeSetting("mediaCaptionYInput", "mediaCaptionYValue", "mediaCaptionY", previewDrag.captionY + dy / Math.max(rect.height, 1) * 100, "%", 8, 92);
+    } else {
+      setMediaRangeSetting("mediaOffsetXInput", "mediaOffsetXValue", "mediaOffsetX", previewDrag.offsetX - dx / Math.max(rect.width, 1) * 200);
+      setMediaRangeSetting("mediaOffsetYInput", "mediaOffsetYValue", "mediaOffsetY", previewDrag.offsetY - dy / Math.max(rect.height, 1) * 200);
+    }
+    updatePreview();
+  });
+  const endPreviewDrag = (event) => {
+    if (!previewDrag || previewDrag.pointerId !== event.pointerId) return;
+    previewCanvas.releasePointerCapture?.(event.pointerId);
+    previewDrag = null;
+    previewCanvas.classList.remove("dragging");
+  };
+  previewCanvas.addEventListener("pointerup", endPreviewDrag);
+  previewCanvas.addEventListener("pointercancel", endPreviewDrag);
   const transferSelectedFile = async (file) => {
     if (!file) return;
-    $("#transferLog").textContent = t("processingMedia");
+    const qualityNote = isMotionMediaFile(file) ? `\n${t("mediaQuality")}：${mediaMotionQuality().label}` : "";
+    $("#transferLog").textContent = `${t("processingMedia")}${qualityNote}`;
     $("#transferProgress").style.width = "0%";
     try {
       const prepared = await prepareMediaFile(file);
@@ -2764,9 +3469,10 @@ function renderMedia() {
   };
   $("#pickFileBtn").addEventListener("click", () => {
     filePicker.accept = "image/*,video/*,.gif";
-    filePicker.onchange = () => transferSelectedFile(filePicker.files[0]);
+    filePicker.onchange = () => selectMediaFile(filePicker.files[0]);
     filePicker.click();
   });
+  $("#uploadMediaBtn").addEventListener("click", () => transferSelectedFile(selectedMediaFile));
   const dropZone = $("#mediaDropZone");
   ["dragenter", "dragover"].forEach((eventName) => {
     dropZone.addEventListener(eventName, (event) => {
@@ -2783,7 +3489,7 @@ function renderMedia() {
     });
   });
   dropZone.addEventListener("drop", (event) => {
-    transferSelectedFile(event.dataTransfer?.files?.[0]);
+    selectMediaFile(event.dataTransfer?.files?.[0]);
   });
   $("#cancelTransferBtn").addEventListener("click", () => {
     activeTransferAbort = true;
@@ -2875,6 +3581,9 @@ function tagId(tag, index) {
 }
 
 function renderDeviceSettings() {
+  const carouselDuration = Math.max(0, Math.min(Number(getCurrentDevice()?.carouselDuration) || 0, 60));
+  const carouselEnabled = carouselDuration > 0;
+  const carouselSliderValue = carouselEnabled ? carouselDuration : 3;
   const controls = [
     ["disableBuzzer", t("buzzer"), t("buzzerDesc")],
     ["disableVibration", t("vibration"), t("vibrationDesc")],
@@ -2884,33 +3593,30 @@ function renderDeviceSettings() {
     ["disableBroadcast", t("broadcast"), t("broadcastDesc")]
   ];
   view.innerHTML = `
-    <div class="split">
-      <div class="panel">
-        <h2>${t("deviceSwitches")}</h2>
-        <div class="actions">
-          <button id="readSettingsBtn" class="secondary-btn" type="button">${t("readSettings")}</button>
-        </div>
-        <p id="settingsStatus" class="muted">${ble.connection ? t("autoReadingSettings") : t("autoReadSkipped")}</p>
-        <div id="switches">${controls.map(([key, title, desc]) => `
-          <label class="switch-row">
-            <span><strong>${title}</strong><br><span class="muted">${desc}</span></span>
-            <input class="switch" data-setting="${key}" type="checkbox" ${state.deviceSettings[key] ? "" : "checked"}>
-          </label>
-        `).join("")}</div>
+    <div class="panel form">
+      <h2>${t("deviceSwitches")}</h2>
+      <div class="actions">
+        <button id="readSettingsBtn" class="secondary-btn" type="button">${t("readSettings")}</button>
       </div>
-      <div class="panel form">
-        <h2>${t("videoCarousel")}</h2>
+      <p id="settingsStatus" class="muted">${ble.connection ? t("autoReadingSettings") : t("autoReadSkipped")}</p>
+      <div id="switches">${controls.map(([key, title, desc]) => `
         <label class="switch-row">
-          <span><strong>${t("carouselEnabled")}</strong><br><span class="muted">${t("carouselSeconds")}</span></span>
-          <input id="carouselToggle" class="switch" type="checkbox" ${Number(getCurrentDevice()?.carouselDuration) > 0 ? "checked" : ""}>
+          <span><strong>${title}</strong><br><span class="muted">${desc}</span></span>
+          <input class="switch" data-setting="${key}" type="checkbox" ${state.deviceSettings[key] ? "" : "checked"}>
         </label>
-        <div class="field">
-          <label>${t("carouselSeconds")}</label>
-          <input id="carouselInput" type="number" min="0" max="3600" value="${Number(getCurrentDevice()?.carouselDuration) || 0}">
-        </div>
-        <div class="actions">
-          <button id="readCarouselBtn" class="secondary-btn" type="button">${t("readCarousel")}</button>
-          <button id="writeCarouselBtn" class="primary-btn" type="button">${t("saveCarousel")}</button>
+      `).join("")}
+        <div class="carousel-setting">
+          <label class="switch-row">
+            <span><strong>${t("carouselEnabled")}</strong><br><span class="muted">${t("videoCarousel")}</span></span>
+            <input id="carouselToggle" class="switch" type="checkbox" ${carouselEnabled ? "checked" : ""}>
+          </label>
+          <div id="carouselSliderWrap" class="carousel-slider ${carouselEnabled ? "" : "hidden"}">
+            <div class="range-grid compact">
+              <span>${t("carouselSeconds")}</span>
+              <input id="carouselInput" type="range" min="1" max="60" value="${carouselSliderValue}">
+              <strong id="carouselValue">${carouselSliderValue}s</strong>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2937,27 +3643,17 @@ function renderDeviceSettings() {
       }
     });
   });
-  $("#readCarouselBtn").addEventListener("click", async () => {
-    try {
-      const seconds = await ble.readCarousel();
-      $("#carouselInput").value = seconds;
-      const device = getCurrentDevice();
-      if (device) updateDevice(device.id, { carouselDuration: seconds });
-      toast(t("carouselRead"));
-      const status = $("#settingsStatus");
-      if (status) status.textContent = t("carouselRead");
-    } catch (error) {
-      toast(formatError(error, t("readFailed")));
-    }
-  });
   $("#carouselToggle").addEventListener("change", async (event) => {
-    const nextSeconds = event.target.checked ? Math.max(1, Number($("#carouselInput").value) || 3) : 0;
-    $("#carouselInput").value = nextSeconds;
+    const nextSeconds = event.target.checked ? Math.max(1, Math.min(Number($("#carouselInput").value) || 3, 60)) : 0;
+    updateCarouselControls(nextSeconds);
     await saveCarouselSeconds(nextSeconds, event.target);
   });
-  $("#writeCarouselBtn").addEventListener("click", async () => {
-    const seconds = $("#carouselToggle").checked ? Number($("#carouselInput").value) || 1 : 0;
-    await saveCarouselSeconds(seconds);
+  $("#carouselInput").addEventListener("input", (event) => {
+    $("#carouselValue").textContent = `${event.target.value}s`;
+  });
+  $("#carouselInput").addEventListener("change", async (event) => {
+    if (!$("#carouselToggle").checked) return;
+    await saveCarouselSeconds(Number(event.target.value) || 1);
   });
   if (ble.connection) setTimeout(() => readSettingsAndCarousel({ notify: false }), 0);
 }
@@ -2973,10 +3669,7 @@ async function readSettingsAndCarousel(options = {}) {
     if (device) updateDevice(device.id, { carouselDuration: seconds, connected: true, statusLabel: t("online") });
     saveState();
     if (options.notify) toast(t("settingsRead"));
-    const input = $("#carouselInput");
-    const toggle = $("#carouselToggle");
-    if (input) input.value = seconds;
-    if (toggle) toggle.checked = seconds > 0;
+    updateCarouselControls(seconds);
     if (status) status.textContent = t("settingsRead");
   } catch (error) {
     if (options.notify) toast(formatError(error, t("readFailed")));
@@ -2992,14 +3685,26 @@ function applyDeviceSettingsToSwitches(settings) {
   });
 }
 
+function updateCarouselControls(seconds) {
+  const normalized = Math.max(0, Math.min(Number(seconds) || 0, 60));
+  const value = normalized > 0 ? normalized : 3;
+  const input = $("#carouselInput");
+  const toggle = $("#carouselToggle");
+  const label = $("#carouselValue");
+  const wrap = $("#carouselSliderWrap");
+  if (input) input.value = value;
+  if (toggle) toggle.checked = normalized > 0;
+  if (label) label.textContent = `${value}s`;
+  if (wrap) wrap.classList.toggle("hidden", normalized <= 0);
+}
+
 async function saveCarouselSeconds(seconds, toggleElement) {
   try {
-    const normalized = Math.max(0, Math.min(Number(seconds) || 0, 3600));
+    const normalized = Math.max(0, Math.min(Number(seconds) || 0, 60));
     await ble.writeCarousel(normalized);
     const device = getCurrentDevice();
     if (device) updateDevice(device.id, { carouselDuration: normalized });
-    $("#carouselInput").value = normalized;
-    $("#carouselToggle").checked = normalized > 0;
+    updateCarouselControls(normalized);
     toast(normalized > 0 ? t("carouselSaved") : t("carouselOff"));
   } catch (error) {
     if (toggleElement) toggleElement.checked = !toggleElement.checked;
@@ -3114,6 +3819,7 @@ async function verifyFirmwareAfterUpdate(deviceBeforeUpdate) {
 }
 
 function renderAppSettings() {
+  const settings = ensureAppSettings();
   view.innerHTML = `
     <div class="split">
       <div class="panel form">
@@ -3129,7 +3835,7 @@ function renderAppSettings() {
         </div>
         <div class="field">
           <label>${t("transferDelay")}</label>
-          <input id="transferDelay" type="number" min="0" max="100" value="${Number(state.appSettings.transferChunkDelay) || 0}">
+          <input id="transferDelay" type="number" min="0" max="100" value="${Number(settings.transferChunkDelay) || 0}">
           <span class="muted">${t("transferDelayHelp")}</span>
         </div>
         <div class="actions">
@@ -3146,7 +3852,7 @@ function renderAppSettings() {
   `;
   $("#settingsLanguageSelect").addEventListener("change", (event) => setLocaleMode(event.target.value));
   $("#saveAppSettingsBtn").addEventListener("click", () => {
-    state.appSettings.transferChunkDelay = Number($("#transferDelay").value) || 0;
+    ensureAppSettings().transferChunkDelay = Number($("#transferDelay").value) || 0;
     saveState();
     toast(t("settingsSaved"));
   });
