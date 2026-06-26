@@ -195,9 +195,14 @@ const i18n = {
     tagSettings: "標籤設定",
     category: "分類",
     tag: "標籤",
+    searchTags: "搜尋標籤",
+    tagSearchPlaceholder: "輸入作品、角色或分類名稱",
+    noTagResults: "找不到符合的標籤",
     addToList: "加入列表",
+    clearAllTags: "清除所有標籤",
     writeToDevice: "寫入設備",
     tagHint: "最多 5 個標籤，點擊標籤可移除。",
+    tagsCleared: "已清除標籤列表",
     deviceSwitches: "設備開關",
     readSettings: "讀取設備設定",
     buzzer: "蜂鳴器",
@@ -222,6 +227,10 @@ const i18n = {
     syncFromDevice: "從設備同步",
     waitingSync: "等待同步",
     noReceivedCards: "尚未收到名片。",
+    deleteReceivedCard: "刪除",
+    confirmDeleteReceivedCard: "確定要刪除這張收到的名片嗎？",
+    receivedCardDeleted: "名片已刪除",
+    deleteReceivedCardFailed: "刪除名片失敗",
     firmwareUpgrade: "韌體升級",
     firmwareHelp: "請選擇可信任的韌體更新檔，並確認設備電量充足後再開始。更新完成並重新連線前，請停留在此頁面。",
     pickFirmware: "選擇韌體檔",
@@ -407,9 +416,14 @@ const i18n = {
     tagSettings: "Tag settings",
     category: "Category",
     tag: "Tag",
+    searchTags: "Search tags",
+    tagSearchPlaceholder: "Search by title, name, or category",
+    noTagResults: "No matching tags",
     addToList: "Add",
+    clearAllTags: "Clear all tags",
     writeToDevice: "Write to device",
     tagHint: "Up to 5 tags. Click a tag to remove it.",
+    tagsCleared: "Tag list cleared",
     deviceSwitches: "Device Settings",
     readSettings: "Read device settings",
     buzzer: "Buzzer",
@@ -434,6 +448,10 @@ const i18n = {
     syncFromDevice: "Sync from device",
     waitingSync: "Waiting to sync",
     noReceivedCards: "No received cards yet.",
+    deleteReceivedCard: "Delete",
+    confirmDeleteReceivedCard: "Delete this received card?",
+    receivedCardDeleted: "Card deleted",
+    deleteReceivedCardFailed: "Couldn’t delete card",
     firmwareUpgrade: "Firmware update",
     firmwareHelp: "Choose a trusted firmware update file, and make sure the device has enough battery before starting. Stay on this page until the update reconnects.",
     pickFirmware: "Choose firmware file",
@@ -619,9 +637,14 @@ const i18n = {
     tagSettings: "タグ設定",
     category: "カテゴリ",
     tag: "タグ",
+    searchTags: "タグを検索",
+    tagSearchPlaceholder: "作品名、名称、カテゴリで検索",
+    noTagResults: "一致するタグがありません",
     addToList: "追加",
+    clearAllTags: "すべてのタグを削除",
     writeToDevice: "端末に書き込み",
     tagHint: "タグは最大 5 個です。タグをクリックすると削除できます。",
+    tagsCleared: "タグ一覧をクリアしました",
     deviceSwitches: "端末設定",
     readSettings: "設定を読み込み",
     buzzer: "ブザー",
@@ -646,6 +669,10 @@ const i18n = {
     syncFromDevice: "端末から同期",
     waitingSync: "同期待ち",
     noReceivedCards: "まだ受け取った名刺はありません。",
+    deleteReceivedCard: "削除",
+    confirmDeleteReceivedCard: "この受け取った名刺を削除しますか？",
+    receivedCardDeleted: "名刺を削除しました",
+    deleteReceivedCardFailed: "名刺を削除できませんでした",
     firmwareUpgrade: "ファームウェア更新",
     firmwareHelp: "信頼できるファームウェア更新ファイルを選び、端末の電池残量を十分に確保してから開始してください。更新後の再接続が完了するまで、このページを開いたままにしてください。",
     pickFirmware: "ファームウェアファイルを選択",
@@ -1125,6 +1152,33 @@ function localizeTagCategories(categories) {
   });
 }
 
+function normalizeTagSearchText(value) {
+  return String(value || "").trim().toLocaleLowerCase();
+}
+
+function tagDisplayName(tag) {
+  return typeof tag === "string" ? tag : tag?.name || tag?.title || tag?.label || "";
+}
+
+function tagOptionEntries(categories, categoryIndex, query) {
+  const normalizedQuery = normalizeTagSearchText(query);
+  const sourceCategories = normalizedQuery ? categories : [categories[categoryIndex] || categories[0]];
+  const sourceOffset = normalizedQuery ? 0 : categoryIndex;
+  return sourceCategories.flatMap((category, sourceIndex) => {
+    const catIndex = normalizedQuery ? sourceIndex : sourceOffset;
+    const categoryName = category?.name || "";
+    return (category?.tags || []).map((tag, tagIndex) => {
+      const tagName = tagDisplayName(tag);
+      return { category, catIndex, tag, tagIndex, categoryName, tagName };
+    }).filter((entry) => {
+      if (!entry.tagName) return false;
+      if (!normalizedQuery) return true;
+      const haystack = normalizeTagSearchText(`${entry.categoryName} ${entry.tagName}`);
+      return haystack.includes(normalizedQuery);
+    });
+  }).slice(0, 200);
+}
+
 const routes = [
   ["devices", "navDevices", renderDevices],
   ["detail", "navDetail", renderDetail],
@@ -1132,7 +1186,6 @@ const routes = [
   ["media", "navMedia", renderMedia],
   ["tags", "navTags", renderTags],
   ["settings", "navSettings", renderDeviceSettings],
-  ["received", "navReceived", renderReceivedCards],
   ["firmware", "navFirmware", renderFirmware],
   ["appsettings", "navAppSettings", renderAppSettings]
 ];
@@ -1198,6 +1251,7 @@ function loadState() {
       appSettings: { ...base.appSettings, ...((cached || {}).appSettings || {}) },
       firmwareBusy: false
     };
+    if (loaded.currentRoute === "received") loaded.currentRoute = "card";
     loaded.devices = Array.isArray(loaded.devices) ? loaded.devices.map((device) => ({ ...device, connected: false })) : [];
     return loaded;
   } catch {
@@ -2074,6 +2128,25 @@ function parseReceivedCard(data) {
     detail,
     receivedAt
   };
+}
+
+function receivedCardKey(card) {
+  if (!card) return "";
+  if (card.sourceMac) return `mac:${String(card.sourceMac).toUpperCase()}`;
+  if (Number.isFinite(Number(card.sourceId)) && Number(card.sourceId) > 0) return `id:${Number(card.sourceId)}`;
+  return String(card.id || "");
+}
+
+function preserveReceivedCardTimes(cards, cachedCards) {
+  const receivedAtByKey = new Map(
+    (Array.isArray(cachedCards) ? cachedCards : [])
+      .map((card) => [receivedCardKey(card), card.receivedAt])
+      .filter(([key, receivedAt]) => key && receivedAt)
+  );
+  return (Array.isArray(cards) ? cards : []).map((card) => {
+    const cachedReceivedAt = receivedAtByKey.get(receivedCardKey(card));
+    return cachedReceivedAt ? { ...card, receivedAt: cachedReceivedAt } : card;
+  });
 }
 
 function sleep(ms) {
@@ -3061,7 +3134,6 @@ function renderDetail() {
         ${featureButton("media", t("mediaFeature"), t("mediaFeatureDesc"))}
         ${featureButton("tags", t("tagsFeature"), t("tagsFeatureDesc"))}
         ${featureButton("settings", t("settingsFeature"), t("settingsFeatureDesc"))}
-        ${featureButton("received", t("receivedFeature"), t("receivedFeatureDesc"))}
         ${featureButton("firmware", t("firmwareFeature"), t("firmwareFeatureDesc"))}
       </div>
     </div>
@@ -3104,6 +3176,7 @@ function renderCard() {
         <pre class="log" id="cardPreview">${escapeHtml(text || t("noCardContent"))}</pre>
       </div>
     </div>
+    ${receivedCardsPanel()}
   `;
   const input = $("#cardText");
   input.addEventListener("input", () => {
@@ -3133,6 +3206,7 @@ function renderCard() {
       toast(formatError(error, t("uploadFailed")));
     }
   });
+  bindReceivedCards();
 }
 
 function renderMedia() {
@@ -3506,6 +3580,10 @@ function renderTags() {
     <div class="panel form">
       <h2>${t("tagSettings")}</h2>
       <div class="field">
+        <label>${t("searchTags")}</label>
+        <input id="tagSearch" type="search" placeholder="${escapeAttr(t("tagSearchPlaceholder"))}">
+      </div>
+      <div class="field">
         <label>${t("category")}</label>
         <select id="tagCategory">${categories.map((item, index) => `<option value="${index}" ${index === defaultCat ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}</select>
       </div>
@@ -3515,6 +3593,7 @@ function renderTags() {
       </div>
       <div class="actions">
         <button id="addTagBtn" class="secondary-btn" type="button">${t("addToList")}</button>
+        <button id="clearTagsBtn" class="danger-btn" type="button">${t("clearAllTags")}</button>
         <button id="writeTagsBtn" class="primary-btn" type="button">${t("writeToDevice")}</button>
       </div>
       <div class="tag-list" id="draftTags"></div>
@@ -3522,10 +3601,13 @@ function renderTags() {
   `;
   const drafts = [];
   const categorySelect = $("#tagCategory");
+  const tagSearch = $("#tagSearch");
   const tagSelect = $("#tagName");
   const renderTagOptions = () => {
-    const cat = categories[Number(categorySelect.value)] || categories[0];
-    tagSelect.innerHTML = (cat.tags || []).filter(Boolean).map((tag, index) => `<option value="${index}">${escapeHtml(typeof tag === "string" ? tag : tag.name || tag.title || tag.label)}</option>`).join("");
+    const entries = tagOptionEntries(categories, Number(categorySelect.value), tagSearch.value);
+    tagSelect.innerHTML = entries.length
+      ? entries.map((entry) => `<option value="${entry.catIndex}:${entry.tagIndex}">${escapeHtml(entry.categoryName)} · ${escapeHtml(entry.tagName)}</option>`).join("")
+      : `<option value="" disabled>${t("noTagResults")}</option>`;
   };
   const renderDrafts = () => {
     $("#draftTags").innerHTML = drafts.map((tag, index) => `<button class="tag-chip" data-remove-tag="${index}" type="button">${escapeHtml(tag.categoryName)} · ${escapeHtml(tag.tagName)}</button>`).join("") || `<span class="muted">${t("tagHint")}</span>`;
@@ -3537,19 +3619,25 @@ function renderTags() {
     });
   };
   categorySelect.addEventListener("change", renderTagOptions);
+  tagSearch.addEventListener("input", renderTagOptions);
   renderTagOptions();
   renderDrafts();
   $("#addTagBtn").addEventListener("click", () => {
     if (drafts.length >= TAGS_MAX_COUNT) return toast(t("maxTags", { count: TAGS_MAX_COUNT }));
-    const catIndex = Number(categorySelect.value);
-    const tagIndex = Number(tagSelect.value);
+    if (!tagSelect.value) return toast(t("noTagResults"));
+    const [catIndex, tagIndex] = tagSelect.value.split(":").map(Number);
     const cat = categories[catIndex];
     const tag = cat.tags[tagIndex];
-    const tagName = typeof tag === "string" ? tag : tag.name || tag.title || tag.label;
+    const tagName = tagDisplayName(tag);
     const payload = { category: categoryId(cat, catIndex), tagId: tagId(tag, tagIndex), categoryName: cat.name, tagName };
     if (drafts.some((item) => item.category === payload.category && item.tagId === payload.tagId)) return toast(t("tagExists"));
     drafts.push(payload);
     renderDrafts();
+  });
+  $("#clearTagsBtn").addEventListener("click", () => {
+    drafts.splice(0, drafts.length);
+    renderDrafts();
+    toast(t("tagsCleared"));
   });
   $("#writeTagsBtn").addEventListener("click", async () => {
     try {
@@ -3560,6 +3648,14 @@ function renderTags() {
           tagName: drafts[0].tagName,
           tagCategoryId: drafts[0].category,
           tagId: drafts[0].tagId,
+          statusLabel: t("settingsSynced")
+        });
+      } else if (device) {
+        updateDevice(device.id, {
+          tagCategory: "",
+          tagName: "",
+          tagCategoryId: 0,
+          tagId: 0,
           statusLabel: t("settingsSynced")
         });
       }
@@ -3712,10 +3808,10 @@ async function saveCarouselSeconds(seconds, toggleElement) {
   }
 }
 
-function renderReceivedCards() {
+function receivedCardsPanel() {
   const device = getCurrentDevice();
   const cards = device ? (state.receivedCardsByDevice[device.id] || []) : [];
-  view.innerHTML = `
+  return `
     <div class="panel">
       <h2>${t("navReceived")}</h2>
       <div class="actions">
@@ -3728,21 +3824,58 @@ function renderReceivedCards() {
         <h2>${escapeHtml(card.description || card.title || t("card"))}</h2>
         <p class="muted">${escapeHtml(card.receivedAt || "")} · ${escapeHtml(card.sourceMac || "")}</p>
         <pre class="log">${escapeHtml(card.detail || "")}</pre>
+        <div class="actions">
+          <button class="danger-btn" data-delete-received-card="${escapeAttr(card.id)}" type="button">${t("deleteReceivedCard")}</button>
+        </div>
       </article>
     `).join("") || `<div class="empty">${t("noReceivedCards")}</div>`}</div>
   `;
+}
+
+function renderReceivedCards() {
+  view.innerHTML = receivedCardsPanel();
+  bindReceivedCards();
+}
+
+function bindReceivedCards() {
+  const device = getCurrentDevice();
+  const cards = device ? (state.receivedCardsByDevice[device.id] || []) : [];
+  const syncButton = $("#syncCardsBtn");
+  if (!syncButton) return;
   $("#syncCardsBtn").addEventListener("click", async () => {
     if (!device) return toast(t("noDevice"));
     try {
       const result = await ble.syncReceivedCards((message) => $("#syncLog").textContent = message);
-      state.receivedCardsByDevice[device.id] = result.cards;
+      state.receivedCardsByDevice[device.id] = preserveReceivedCardTimes(result.cards, cards);
       saveState();
-      toast(result.cards.length ? t("syncedCards", { count: result.cards.length }) : t("noReceivedCards"));
+      toast(state.receivedCardsByDevice[device.id].length ? t("syncedCards", { count: state.receivedCardsByDevice[device.id].length }) : t("noReceivedCards"));
       render();
     } catch (error) {
       $("#syncLog").textContent = formatError(error, t("syncFailed"));
       toast(formatError(error, t("syncFailed")));
     }
+  });
+  document.querySelectorAll("[data-delete-received-card]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      if (!device) return toast(t("noDevice"));
+      const cardId = button.getAttribute("data-delete-received-card");
+      const currentCards = state.receivedCardsByDevice[device.id] || [];
+      const card = currentCards.find((item) => item.id === cardId);
+      const sourceId = Number(card?.sourceId);
+      if (!card || !Number.isFinite(sourceId) || sourceId <= 0) return toast(t("deleteReceivedCardFailed"));
+      if (!confirm(t("confirmDeleteReceivedCard"))) return;
+      button.disabled = true;
+      try {
+        await ble.deleteReceivedCard(sourceId);
+        state.receivedCardsByDevice[device.id] = currentCards.filter((item) => item.id !== cardId);
+        saveState();
+        toast(t("receivedCardDeleted"));
+        render();
+      } catch (error) {
+        button.disabled = false;
+        toast(formatError(error, t("deleteReceivedCardFailed")));
+      }
+    });
   });
 }
 
