@@ -269,6 +269,7 @@ const i18n = {
     connectedToast: "設備已連線",
     connectFailed: "連線失敗",
     noDevice: "還沒有設備",
+    refreshRequiresConnection: "重新整理前請先連線到設備",
     deviceUpdated: "設備已更新",
     updateFailed: "更新失敗",
     nameSaved: "名稱已儲存",
@@ -499,6 +500,7 @@ const i18n = {
     connectedToast: "Device connected",
     connectFailed: "Couldn’t connect",
     noDevice: "No devices yet",
+    refreshRequiresConnection: "Connect the device before refreshing",
     deviceUpdated: "Device updated",
     updateFailed: "Update failed",
     nameSaved: "Name saved",
@@ -729,6 +731,7 @@ const i18n = {
     connectedToast: "端末を接続しました",
     connectFailed: "接続できませんでした",
     noDevice: "端末がありません",
+    refreshRequiresConnection: "更新する前に端末を接続してください",
     deviceUpdated: "端末状態を更新しました",
     updateFailed: "更新に失敗しました",
     nameSaved: "名前を保存しました",
@@ -1837,7 +1840,7 @@ class MoniCardWebBluetooth {
   }
 
   async connectGranted(savedDevice = {}) {
-    if (!navigator.bluetooth?.getDevices) throw new Error("此瀏覽器不支援讀取已授權設備");
+    if (!navigator.bluetooth?.getDevices) throw new Error(t("refreshRequiresConnection"));
     const devices = await navigator.bluetooth.getDevices();
     const target = devices.find((device) => {
       return device.id === savedDevice.bleDeviceId || device.name === savedDevice.name || /monicard/i.test(device.name || "");
