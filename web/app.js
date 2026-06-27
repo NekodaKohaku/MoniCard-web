@@ -1314,6 +1314,7 @@ function loadState() {
       firmwareBusy: false
     };
     if (loaded.currentRoute === "received") loaded.currentRoute = "card";
+    loaded.currentRoute = "devices";
     loaded.devices = Array.isArray(loaded.devices) ? loaded.devices.map((device) => ({ ...device, connected: false })) : [];
     return loaded;
   } catch {
