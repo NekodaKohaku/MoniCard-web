@@ -87,7 +87,7 @@ const i18n = {
   "zh-Hant": {
     appTitle: "魔力卡 Web",
     brandName: "魔力卡",
-    autoLanguage: "跟隨系統",
+    autoLanguage: "跟隨系統語言",
     navDevices: "設備",
     navDetail: "詳情",
     navCard: "名片",
@@ -143,13 +143,22 @@ const i18n = {
     defaultCard: "MoniCard\nQQ：12345678\n我是 Monica",
     mediaTransfer: "素材傳輸",
     mediaHelp: "上傳想在設備上顯示的照片、短影片或 GIF。",
-    mediaProcessHelp: "系統會自動調整尺寸與格式；影片與 GIF 會取前 10 秒製作成設備素材，建議使用直式 3:4 素材。品質越高，檔案越大、傳輸越久。",
+    mediaProcessHelp: "系統會自動調整尺寸與格式；影片與 GIF 預設取前 10 秒製作成設備素材。開啟上傳前編輯後，可以改選任意 10 秒內片段。建議使用直式 3:4 素材。",
     mediaQuality: "素材品質",
     mediaQualityHigh: "畫質優先（約 87%，預設）",
     mediaQualityBalanced: "平衡（約 70%）",
     mediaQualityCompact: "省空間（約 45%）",
     mediaQualityMaximum: "最高品質（不建議，檔案較大）",
     mediaQualityHelp: "只影響影片與 GIF 的畫質和檔案大小，不改變解析度與幀率。",
+    mediaClip: "影片 / GIF 片段",
+    mediaClipHelp: "可從原始影片或 GIF 中選取任意片段，最長 10 秒。",
+    mediaClipStart: "開始",
+    mediaClipEnd: "結束",
+    mediaSummary: "素材摘要",
+    mediaSummaryEmpty: "選擇素材後會顯示解析度、秒數、幀數與原始大小。",
+    mediaPreparedSummary: "素材摘要\n原始：{source}\n輸出：{output}\n轉檔後大小：{fileSize}",
+    mediaStorageWarning: "設備剩餘空間偏低。此素材上傳約需 {size} 空間，設備目前剩餘約 {free}。仍要繼續上傳嗎？",
+    mediaStorageUnknown: "無法讀取設備剩餘空間，仍要繼續上傳嗎？",
     mediaLayout: "顯示方式",
     mediaEditBeforeUpload: "上傳前編輯素材",
     mediaEditBeforeUploadDesc: "開啟後可先預覽、拖曳裁切位置並加上文字。",
@@ -205,6 +214,10 @@ const i18n = {
     readDeviceTags: "讀取設備標籤",
     writeToDevice: "寫入設備",
     tagHint: "最多 5 個標籤，點擊標籤可移除。",
+    currentDeviceTags: "目前設備標籤",
+    pendingDeviceTags: "準備寫入的新標籤",
+    noPendingTags: "尚未選擇要寫入的標籤",
+    confirmOverwriteTags: "寫入後會覆蓋設備目前的標籤設定。要繼續嗎？",
     tagsCleared: "已清除標籤列表",
     readingDeviceTags: "正在讀取設備標籤，請保持設備開機並靠近電腦。",
     tagsRead: "已讀取 {count} 個設備標籤",
@@ -245,6 +258,11 @@ const i18n = {
     firmwareUpgrade: "韌體升級",
     firmwareHelp: "請選擇可信任的韌體更新檔，並確認設備電量充足後再開始。更新完成並重新連線前，請停留在此頁面。",
     pickFirmware: "選擇韌體檔",
+    firmwareAdvanced: "進階韌體更新",
+    firmwareAdvancedHelp: "僅在你確定檔案來自官方且對應此設備時使用。",
+    firmwareCurrentVersion: "目前設備韌體版本：{version}",
+    firmwareConfirmOfficial: "我確認這是官方提供且對應此設備的韌體檔",
+    firmwareRequireConfirm: "請先確認韌體檔來源與設備型號。",
     waitingFirmware: "等待選擇韌體檔",
     firmwareReady: "已讀取韌體檔：{name}\n大小：{size}\n更新期間請勿切換頁面、關閉瀏覽器、讓電腦睡眠，或中斷設備電源。",
     firmwareOnlyBin: "韌體更新只接受官方 .bin 檔。",
@@ -262,7 +280,6 @@ const i18n = {
     transferDelay: "傳輸包間隔 ms",
     transferDelayHelp: "每個藍牙資料包之間的等待時間。數值越大越穩但越慢；一般不需要調整。",
     saveSettings: "儲存設定",
-    exportData: "匯出資料",
     clearData: "清空網頁資料",
     migrationNotes: "使用說明",
     migrationHelp: "請使用 Chrome 或 Edge，並透過 HTTPS 網址開啟。首次連線設備時，瀏覽器會要求你手動選擇並授權。",
@@ -322,7 +339,7 @@ const i18n = {
   en: {
     appTitle: "MoniCard Web",
     brandName: "MoniCard",
-    autoLanguage: "Use system language",
+    autoLanguage: "System language",
     navDevices: "Devices",
     navDetail: "Overview",
     navCard: "Digital Card",
@@ -378,13 +395,22 @@ const i18n = {
     defaultCard: "MoniCard\nQQ: 12345678\nHi, I'm Monica.",
     mediaTransfer: "Asset upload",
     mediaHelp: "Upload images, videos, or GIFs to show on your device.",
-    mediaProcessHelp: "Files are automatically resized and prepared for the display. Videos and GIFs use the first 10 seconds. Portrait 3:4 assets work best. Higher quality creates larger files and takes longer to upload.",
+    mediaProcessHelp: "Files are automatically resized and prepared for the display. Videos and GIFs use the first 10 seconds by default. Turn on editing to choose any segment up to 10 seconds. Portrait 3:4 assets work best.",
     mediaQuality: "Asset quality",
     mediaQualityHigh: "Quality first (about 87%, default)",
     mediaQualityBalanced: "Balanced (about 70%)",
     mediaQualityCompact: "Save space (about 45%)",
     mediaQualityMaximum: "Maximum quality (not recommended, larger files)",
     mediaQualityHelp: "Affects video and GIF quality and file size only. Resolution and frame rate stay the same.",
+    mediaClip: "Video / GIF clip",
+    mediaClipHelp: "Choose any segment from the original video or GIF, up to 10 seconds.",
+    mediaClipStart: "Start",
+    mediaClipEnd: "End",
+    mediaSummary: "Asset summary",
+    mediaSummaryEmpty: "Choose an asset to see resolution, duration, frames, and original size.",
+    mediaPreparedSummary: "Asset summary\nSource: {source}\nOutput: {output}\nPrepared size: {fileSize}",
+    mediaStorageWarning: "Device storage is low. Uploading this asset needs about {size}, and about {free} is available. Continue uploading?",
+    mediaStorageUnknown: "Couldn’t read remaining device storage. Continue uploading?",
     mediaLayout: "Display mode",
     mediaEditBeforeUpload: "Edit before upload",
     mediaEditBeforeUploadDesc: "Preview the asset, drag to adjust framing, and add text before uploading.",
@@ -440,6 +466,10 @@ const i18n = {
     readDeviceTags: "Read device tags",
     writeToDevice: "Write to device",
     tagHint: "Up to 5 tags. Click a tag to remove it.",
+    currentDeviceTags: "Current device tags",
+    pendingDeviceTags: "Tags to write",
+    noPendingTags: "No tags selected to write yet",
+    confirmOverwriteTags: "Writing will overwrite the current tag settings on the device. Continue?",
     tagsCleared: "Tag list cleared",
     readingDeviceTags: "Reading device tags. Keep the device powered on and near this computer.",
     tagsRead: "Read {count} device tags",
@@ -480,6 +510,11 @@ const i18n = {
     firmwareUpgrade: "Firmware update",
     firmwareHelp: "Choose a trusted firmware update file, and make sure the device has enough battery before starting. Stay on this page until the update reconnects.",
     pickFirmware: "Choose firmware file",
+    firmwareAdvanced: "Advanced firmware update",
+    firmwareAdvancedHelp: "Use only when you are sure the file is official and made for this device.",
+    firmwareCurrentVersion: "Current firmware version: {version}",
+    firmwareConfirmOfficial: "I confirm this is the official firmware file for this device",
+    firmwareRequireConfirm: "Confirm the firmware source and device model first.",
     waitingFirmware: "Waiting for a firmware file",
     firmwareReady: "Firmware file loaded: {name}\nSize: {size}\nDo not switch pages, close the browser, let the computer sleep, or power off the device during the update.",
     firmwareOnlyBin: "Firmware updates only accept official .bin files.",
@@ -497,7 +532,6 @@ const i18n = {
     transferDelay: "Packet delay, ms",
     transferDelayHelp: "Delay between Bluetooth packets. Higher values can be more stable but slower. Most users should leave this unchanged.",
     saveSettings: "Save settings",
-    exportData: "Export data",
     clearData: "Clear web data",
     migrationNotes: "Usage notes",
     migrationHelp: "Use Chrome or Edge and open the app from an HTTPS address. The browser will ask you to choose and authorize the device the first time you connect.",
@@ -557,7 +591,7 @@ const i18n = {
   ja: {
     appTitle: "MoniCard Web",
     brandName: "MoniCard",
-    autoLanguage: "システム設定に合わせる",
+    autoLanguage: "システム言語",
     navDevices: "端末",
     navDetail: "概要",
     navCard: "名刺",
@@ -613,13 +647,22 @@ const i18n = {
     defaultCard: "MoniCard\nQQ：12345678\nMonicaです",
     mediaTransfer: "素材アップロード",
     mediaHelp: "端末に表示したい画像、動画、GIFをアップロードできます。",
-    mediaProcessHelp: "表示に合わせてサイズと形式を自動調整します。動画とGIFは先頭10秒を端末用素材にします。縦長の3:4素材がおすすめです。品質を上げるほどファイルサイズが大きくなり、アップロード時間も長くなります。",
+    mediaProcessHelp: "表示に合わせてサイズと形式を自動調整します。動画とGIFは初期設定では先頭10秒を端末用素材にします。アップロード前編集をオンにすると、任意の最大10秒を選べます。縦長の3:4素材がおすすめです。",
     mediaQuality: "素材品質",
     mediaQualityHigh: "画質優先（約87%、初期設定）",
     mediaQualityBalanced: "バランス（約70%）",
     mediaQualityCompact: "容量優先（約45%）",
     mediaQualityMaximum: "最高品質（非推奨、ファイルサイズ大）",
     mediaQualityHelp: "動画とGIFの画質とファイルサイズにのみ影響します。解像度とフレームレートは変わりません。",
+    mediaClip: "動画 / GIF の範囲",
+    mediaClipHelp: "元の動画またはGIFから、最大10秒まで任意の範囲を選べます。",
+    mediaClipStart: "開始",
+    mediaClipEnd: "終了",
+    mediaSummary: "素材の概要",
+    mediaSummaryEmpty: "素材を選択すると、解像度、秒数、フレーム数、元のサイズを表示します。",
+    mediaPreparedSummary: "素材の概要\n元データ：{source}\n出力：{output}\n変換後サイズ：{fileSize}",
+    mediaStorageWarning: "端末の空き容量が少なくなっています。この素材のアップロードには約 {size} 必要です。端末の空き容量は約 {free} です。アップロードを続行しますか？",
+    mediaStorageUnknown: "端末の空き容量を読み取れませんでした。アップロードを続行しますか？",
     mediaLayout: "表示方法",
     mediaEditBeforeUpload: "アップロード前に編集",
     mediaEditBeforeUploadDesc: "アップロード前にプレビュー、ドラッグで位置調整、文字入れができます。",
@@ -675,6 +718,10 @@ const i18n = {
     readDeviceTags: "端末のタグを読み込み",
     writeToDevice: "端末に書き込み",
     tagHint: "タグは最大 5 個です。タグをクリックすると削除できます。",
+    currentDeviceTags: "現在の端末タグ",
+    pendingDeviceTags: "書き込む新しいタグ",
+    noPendingTags: "書き込むタグはまだ選択されていません",
+    confirmOverwriteTags: "書き込むと端末の現在のタグ設定が上書きされます。続行しますか？",
     tagsCleared: "タグ一覧をクリアしました",
     readingDeviceTags: "端末のタグを読み込んでいます。端末の電源を入れ、PCの近くに置いてください。",
     tagsRead: "端末のタグを {count} 個読み込みました",
@@ -715,6 +762,11 @@ const i18n = {
     firmwareUpgrade: "ファームウェア更新",
     firmwareHelp: "信頼できるファームウェア更新ファイルを選び、端末の電池残量を十分に確保してから開始してください。更新後の再接続が完了するまで、このページを開いたままにしてください。",
     pickFirmware: "ファームウェアファイルを選択",
+    firmwareAdvanced: "高度なファームウェア更新",
+    firmwareAdvancedHelp: "公式かつこの端末に対応したファイルだと確認できる場合のみ使用してください。",
+    firmwareCurrentVersion: "現在のファームウェア：{version}",
+    firmwareConfirmOfficial: "公式提供で、この端末に対応したファームウェアファイルであることを確認しました",
+    firmwareRequireConfirm: "先にファームウェアの入手元と端末モデルを確認してください。",
     waitingFirmware: "ファームウェアファイルの選択待ち",
     firmwareReady: "ファームウェアファイルを読み込みました：{name}\nサイズ：{size}\n更新中はページを切り替えず、ブラウザを閉じず、PCをスリープさせず、端末の電源を切らないでください。",
     firmwareOnlyBin: "ファームウェア更新は公式の .bin ファイルのみ対応しています。",
@@ -732,7 +784,6 @@ const i18n = {
     transferDelay: "パケット間隔 ms",
     transferDelayHelp: "Bluetooth パケット間の待ち時間です。大きいほど安定しやすくなりますが遅くなります。通常は変更不要です。",
     saveSettings: "設定を保存",
-    exportData: "データを書き出し",
     clearData: "Web データを消去",
     migrationNotes: "ご利用メモ",
     migrationHelp: "Chrome または Edge で、HTTPS のURLから開いてください。初回接続時は、ブラウザ上で端末を選択して許可する必要があります。",
@@ -1284,9 +1335,14 @@ const initialState = () => ({
     mediaCaptionCustomFont: "",
     mediaCaptionBold: true,
     mediaCaptionItalic: false,
-    mediaCaptionDirection: "horizontal"
+    mediaCaptionDirection: "horizontal",
+    mediaClipStartMs: 0,
+    mediaClipEndMs: MOTION_MAX_DURATION_MS,
+    firmwareAdvancedVisible: false,
+    firmwareRiskAccepted: false
   },
   firmwareBusy: false,
+  mediaBusy: false,
   localeMode: readStoredValue(LOCALE_STORAGE_KEY, "auto"),
   locale: detectLocale(),
   tagCategories: []
@@ -1311,7 +1367,8 @@ function loadState() {
       ...base,
       ...(cached || {}),
       appSettings: { ...base.appSettings, ...((cached || {}).appSettings || {}) },
-      firmwareBusy: false
+      firmwareBusy: false,
+      mediaBusy: false
     };
     if (loaded.currentRoute === "received") loaded.currentRoute = "card";
     loaded.currentRoute = "devices";
@@ -1359,6 +1416,7 @@ function setBanner(message = "") {
 function formatError(error, fallback = t("saveFailed")) {
   const message = String(error && (error.message || error.name) || fallback);
   if (/User cancelled|cancelled|canceled|NotFoundError/i.test(message)) return t("errorCanceled");
+  if (message === t("refreshRequiresConnection") || message === t("errorNoConnection")) return message;
   if (/GATT|Bluetooth|NetworkError|disconnected/i.test(message)) return t("errorBluetooth", { fallback });
   if (/timeout|超时/i.test(message)) return t("errorTimeout", { fallback });
   return t("errorGeneric", { fallback, message: localizeKnownErrorMessage(message) });
@@ -2101,6 +2159,12 @@ class MoniCardWebBluetooth {
     return tags;
   }
 
+  async readFileSystemInfo() {
+    await this.ensureConnected();
+    const message = await this.control(encodeGetFileSystemInfo(), CONTROL_COMMAND.GET_FS_INFO_RESPONSE, 5000);
+    return parseFsInfo(message);
+  }
+
   async syncReceivedCards(onProgress) {
     await this.ensureConnected();
     const countMessage = await this.control(encodeReadCardsCount(), CONTROL_COMMAND.RESP_CARDS_COUNT, 1500);
@@ -2460,6 +2524,24 @@ function mediaMotionQuality() {
   return MEDIA_QUALITY_OPTIONS[key] || MEDIA_QUALITY_OPTIONS.high;
 }
 
+function mediaClipSettings(totalDurationMs = MOTION_MAX_DURATION_MS) {
+  const settings = ensureAppSettings();
+  const total = Math.max(100, Number(totalDurationMs) || MOTION_MAX_DURATION_MS);
+  if (!settings.mediaEditBeforeUpload) {
+    const end = Math.min(total, MOTION_MAX_DURATION_MS);
+    return { startMs: 0, endMs: Math.round(end), durationMs: Math.max(100, Math.round(end)) };
+  }
+  const startMax = Math.max(0, total - 100);
+  const start = clamp(settings.mediaClipStartMs ?? 0, 0, startMax);
+  const maxEnd = Math.min(total, start + MOTION_MAX_DURATION_MS);
+  const end = clamp(settings.mediaClipEndMs ?? maxEnd, start + 100, maxEnd);
+  return { startMs: Math.round(start), endMs: Math.round(end), durationMs: Math.max(100, Math.round(end - start)) };
+}
+
+function mediaClipLabel(startMs, endMs) {
+  return `${(Math.round(startMs) / 1000).toFixed(1)}-${(Math.round(endMs) / 1000).toFixed(1)}s`;
+}
+
 function quoteFontName(name) {
   return `"${String(name || "").replace(/["\\]/g, "\\$&")}"`;
 }
@@ -2567,6 +2649,8 @@ async function prepareImageMedia(file) {
     bytes: await blobToBytes(blob),
     fileName: imageResourceFileName(),
     kind: "image",
+    source: `${image.naturalWidth || image.width || "--"}x${image.naturalHeight || image.height || "--"}`,
+    output: "240x320 PNG",
     label: "240x320 PNG"
   };
 }
@@ -2687,7 +2771,8 @@ async function prepareVideoMedia(file) {
     const canvas = makeCanvas(240, 320);
     const ctx = canvas.getContext("2d");
     const sourceDurationMs = Math.max(0, Math.round((Number(video.duration) || 0) * 1000));
-    const durationMs = sourceDurationMs ? Math.min(sourceDurationMs, MOTION_MAX_DURATION_MS) : 1000;
+    const clip = mediaClipSettings(sourceDurationMs || MOTION_MAX_DURATION_MS);
+    const durationMs = clip.durationMs || 1000;
     const duration = durationMs / 1000;
     const frameRate = MOTION_MAX_FRAME_RATE;
     const frameCount = Math.max(1, Math.ceil(duration * frameRate));
@@ -2695,16 +2780,18 @@ async function prepareVideoMedia(file) {
     const options = mediaProcessingOptions();
     const quality = mediaMotionQuality();
     for (let index = 0; index < frameCount; index += 1) {
-      await seekVideo(video, frameCount === 1 ? 0 : Math.min(duration - 0.01, index / frameRate));
+      const time = (clip.startMs / 1000) + (frameCount === 1 ? 0 : Math.min(duration - 0.01, index / frameRate));
+      await seekVideo(video, time);
       drawPreparedFrame(ctx, video, video.videoWidth || 240, video.videoHeight || 320, options);
       frames.push(await blobToBytes(await canvasToBlob(canvas, "image/jpeg", quality.ratio)));
     }
-    const clipped = sourceDurationMs > MOTION_MAX_DURATION_MS;
     return {
       bytes: buildMjpegMp4(frames, { frameRate, width: 240, height: 320 }),
       fileName: motionResourceFileName(),
       kind: "motion",
-      label: `240x320 MJPEG MP4 · ${frameRate} fps · ${frameCount} frames · quality ${quality.label}${clipped ? " · first 10s" : ""}`
+      source: `${video.videoWidth || "--"}x${video.videoHeight || "--"} · ${sourceDurationMs ? (sourceDurationMs / 1000).toFixed(1) : "--"}s`,
+      output: `240x320 MJPEG MP4 · ${frameRate} fps · ${frameCount} frames · ${mediaClipLabel(clip.startMs, clip.endMs)} · quality ${quality.label}`,
+      label: `240x320 MJPEG MP4 · ${frameRate} fps · ${frameCount} frames · ${mediaClipLabel(clip.startMs, clip.endMs)} · quality ${quality.label}`
     };
   } finally {
     URL.revokeObjectURL(url);
@@ -3005,14 +3092,17 @@ function gifFrameAtMs(gif, ms) {
 }
 
 function sampleGifFrames(gif, maxDurationMs = MOTION_MAX_DURATION_MS, maxFrameRate = MOTION_MAX_FRAME_RATE) {
-  const duration = Math.min(gif.totalDurationMs || 0, maxDurationMs);
+  const clip = mediaClipSettings(gif.totalDurationMs || maxDurationMs);
+  const duration = Math.min(clip.durationMs, maxDurationMs);
   const sourceRate = gif.frameCount && gif.totalDurationMs ? Math.max(1, Math.round(1000 * gif.frameCount / gif.totalDurationMs)) : 1;
   const frameRate = Math.max(1, Math.min(sourceRate, maxFrameRate));
   const frameCount = Math.max(1, Math.ceil(duration / (1000 / frameRate)));
   return {
     frameRate,
     durationMs: duration,
-    frames: Array.from({ length: frameCount }, (_, index) => gifFrameAtMs(gif, Math.min(duration - 1, Math.round(index * 1000 / frameRate))))
+    startMs: clip.startMs,
+    endMs: clip.endMs,
+    frames: Array.from({ length: frameCount }, (_, index) => gifFrameAtMs(gif, Math.min(clip.endMs - 1, clip.startMs + Math.round(index * 1000 / frameRate))))
   };
 }
 
@@ -3036,7 +3126,9 @@ async function prepareGifMedia(file) {
     bytes: buildMjpegMp4(frames, { frameRate: sample.frameRate, width: 240, height: 320 }),
     fileName: motionResourceFileName(),
     kind: "motion",
-    label: `240x320 MJPEG MP4 · GIF · ${sample.frameRate} fps · ${frames.length} frames · quality ${quality.label}${clipped ? " · first 10s" : ""}`
+    source: `${gif.width}x${gif.height} · ${(gif.totalDurationMs / 1000).toFixed(1)}s · ${gif.frameCount} frames`,
+    output: `240x320 MJPEG MP4 · GIF · ${sample.frameRate} fps · ${frames.length} frames · ${mediaClipLabel(sample.startMs, sample.endMs)} · quality ${quality.label}`,
+    label: `240x320 MJPEG MP4 · GIF · ${sample.frameRate} fps · ${frames.length} frames · ${mediaClipLabel(sample.startMs, sample.endMs)} · quality ${quality.label}${clipped ? " · clipped" : ""}`
   };
 }
 
@@ -3070,6 +3162,36 @@ async function renderMediaPreview(file, canvas) {
     return;
   }
   throw new Error("Unsupported media type");
+}
+
+async function startVideoMediaPreview(file, canvas, isActive = () => true) {
+  const { video, url } = await loadVideoFromFile(file);
+  const ctx = canvas.getContext("2d");
+  const options = mediaProcessingOptions(true);
+  const clip = mediaClipSettings(Math.max(100, Math.round((Number(video.duration) || 0) * 1000)));
+  let frameId = 0;
+  let seeking = false;
+  let stopped = false;
+  const draw = async () => {
+    if (stopped || !isActive()) return;
+    if (!seeking && video.currentTime * 1000 >= clip.endMs - 20) {
+      seeking = true;
+      await seekVideo(video, clip.startMs / 1000).catch(() => {});
+      seeking = false;
+      video.play?.().catch(() => {});
+    }
+    drawPreparedFrame(ctx, video, video.videoWidth || 240, video.videoHeight || 320, options);
+    frameId = requestAnimationFrame(draw);
+  };
+  await seekVideo(video, clip.startMs / 1000);
+  await video.play?.().catch(() => {});
+  draw();
+  return () => {
+    stopped = true;
+    cancelAnimationFrame(frameId);
+    video.pause?.();
+    URL.revokeObjectURL(url);
+  };
 }
 
 async function prepareMediaFile(file) {
@@ -3189,12 +3311,13 @@ function showRenderError(error) {
 
 function renderNav() {
   $("#nav").innerHTML = routes.map(([key, label]) => {
-    const disabled = state.firmwareBusy && key !== "firmware";
+    const disabled = (state.firmwareBusy && key !== "firmware") || (state.mediaBusy && key !== "media");
     return `<button class="${state.currentRoute === key ? "active" : ""}" data-route="${key}" type="button" ${disabled ? "disabled" : ""}>${t(label)}</button>`;
   }).join("");
   $("#nav").querySelectorAll("button").forEach((button) => {
     button.addEventListener("click", () => {
       if (state.firmwareBusy && button.dataset.route !== "firmware") return;
+      if (state.mediaBusy && button.dataset.route !== "media") return;
       setState({ currentRoute: button.dataset.route });
     });
   });
@@ -3427,6 +3550,8 @@ function renderMedia() {
   const mediaCaptionItalic = Boolean(settings.mediaCaptionItalic);
   const mediaCaptionDirection = settings.mediaCaptionDirection === "vertical" ? "vertical" : "horizontal";
   const mediaQuality = MEDIA_QUALITY_OPTIONS[settings.mediaQuality] ? settings.mediaQuality : "high";
+  const clipStart = Math.round(clamp(settings.mediaClipStartMs ?? 0, 0, MOTION_MAX_DURATION_MS) / 100) / 10;
+  const clipEnd = Math.round(clamp(settings.mediaClipEndMs ?? MOTION_MAX_DURATION_MS, 0.1, MOTION_MAX_DURATION_MS) / 100) / 10;
   const editBeforeUpload = Boolean(settings.mediaEditBeforeUpload);
   view.innerHTML = `
     <div class="panel form">
@@ -3453,6 +3578,18 @@ function renderMedia() {
         <input id="mediaEditToggle" class="switch" type="checkbox" ${editBeforeUpload ? "checked" : ""}>
       </label>
       <div id="mediaEditor" class="${editBeforeUpload ? "" : "hidden"}">
+        <div class="field hidden" id="mediaClipField">
+          <label>${t("mediaClip")}</label>
+          <div class="range-grid">
+            <span>${t("mediaClipStart")}</span>
+            <input id="mediaClipStartInput" type="range" min="0" max="9.9" step="0.1" value="${Math.min(clipStart, 9.9)}">
+            <strong id="mediaClipStartValue">${Math.min(clipStart, 9.9).toFixed(1)}s</strong>
+            <span>${t("mediaClipEnd")}</span>
+            <input id="mediaClipEndInput" type="range" min="0.1" max="10" step="0.1" value="${Math.max(clipEnd, 0.1)}">
+            <strong id="mediaClipEndValue">${Math.max(clipEnd, 0.1).toFixed(1)}s</strong>
+          </div>
+          <span class="muted">${t("mediaClipHelp")}</span>
+        </div>
         <div class="field">
           <label>${t("mediaLayout")}</label>
           <select id="mediaLayoutSelect">
@@ -3540,22 +3677,101 @@ function renderMedia() {
       <div class="actions">
         <button id="pickFileBtn" class="primary-btn" type="button">${t("pickAndTransfer")}</button>
         <button id="uploadMediaBtn" class="secondary-btn ${editBeforeUpload ? "" : "hidden"}" type="button" disabled>${t("uploadSelectedMedia")}</button>
-        <button id="cancelTransferBtn" class="danger-btn" type="button">${t("cancelTransfer")}</button>
+        <button id="cancelTransferBtn" class="danger-btn" type="button" disabled>${t("cancelTransfer")}</button>
       </div>
       <div id="mediaDropZone" class="drop-zone">${t("dropMedia")}</div>
+      <div class="summary-box" id="mediaSummaryBox">
+        <strong>${t("mediaSummary")}</strong>
+        <span id="mediaSummaryText">${t("mediaSummaryEmpty")}</span>
+      </div>
       <div class="progress"><span id="transferProgress"></span></div>
       <pre id="transferLog" class="log">${t("waitingFile")}</pre>
     </div>
   `;
   let selectedMediaFile = null;
   let previewToken = 0;
+  let previewCleanup = null;
+  let clipDurationSec = 10;
   const isEditingMedia = () => Boolean(ensureAppSettings().mediaEditBeforeUpload);
+  const setMediaControlsBusy = (busy) => {
+    $("#pickFileBtn").disabled = busy;
+    $("#uploadMediaBtn").disabled = busy || !isEditingMedia() || !selectedMediaFile;
+    $("#cancelTransferBtn").disabled = !busy;
+    $("#connectBtn").disabled = busy;
+    $("#disconnectBtn").disabled = busy;
+    $("#languageSelect").disabled = busy;
+    dropZone.classList.toggle("disabled", busy);
+  };
+  const stopPreviewPlayback = () => {
+    if (previewCleanup) previewCleanup();
+    previewCleanup = null;
+  };
+  const setMediaSummary = (text) => {
+    const el = $("#mediaSummaryText");
+    if (el) el.textContent = text || t("mediaSummaryEmpty");
+  };
+  const mediaDurationMs = async (file) => {
+    if (!file) return MOTION_MAX_DURATION_MS;
+    const type = String(file.type || "").toLowerCase();
+    const name = String(file.name || "").toLowerCase();
+    if (type.includes("gif") || name.endsWith(".gif")) return parseGifBytes(await file.arrayBuffer()).totalDurationMs || MOTION_MAX_DURATION_MS;
+    if (type.startsWith("video/")) {
+      const { video, url } = await loadVideoFromFile(file);
+      try {
+        return Math.max(100, Math.round((Number(video.duration) || 0) * 1000));
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+    return MOTION_MAX_DURATION_MS;
+  };
+  const updateClipControlBounds = async (file) => {
+    const isMotion = isMotionMediaFile(file);
+    $("#mediaClipField").classList.toggle("hidden", !isMotion);
+    if (!isMotion) return;
+    clipDurationSec = Math.max(0.1, Math.round(await mediaDurationMs(file) / 100) / 10);
+    $("#mediaClipStartInput").max = Math.max(0, clipDurationSec - 0.1).toFixed(1);
+    $("#mediaClipEndInput").max = clipDurationSec.toFixed(1);
+    updateClipValues();
+  };
+  const describeSelectedFile = async (file) => {
+    if (!file) return t("mediaSummaryEmpty");
+    const type = String(file.type || "").toLowerCase();
+    const name = String(file.name || "").toLowerCase();
+    try {
+      if (type.startsWith("image/")) {
+        const image = await loadImageFromFile(file);
+        return `${image.naturalWidth || image.width}x${image.naturalHeight || image.height} · ${formatBytes(file.size)}`;
+      }
+      if (type.includes("gif") || name.endsWith(".gif")) {
+        const gif = parseGifBytes(await file.arrayBuffer());
+        return `${gif.width}x${gif.height} · ${(gif.totalDurationMs / 1000).toFixed(1)}s · ${gif.frameCount} frames · ${formatBytes(file.size)}`;
+      }
+      if (type.startsWith("video/")) {
+        const { video, url } = await loadVideoFromFile(file);
+        try {
+          return `${video.videoWidth || "--"}x${video.videoHeight || "--"} · ${Number(video.duration || 0).toFixed(1)}s · ${formatBytes(file.size)}`;
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      }
+    } catch {
+      return `${file.name || t("resourceFile")} · ${formatBytes(file.size)}`;
+    }
+    return `${file.name || t("resourceFile")} · ${formatBytes(file.size)}`;
+  };
   const updatePreview = async () => {
     const file = selectedMediaFile;
     if (!file || !isEditingMedia()) return;
     const token = ++previewToken;
+    stopPreviewPlayback();
     try {
-      await renderMediaPreview(file, $("#mediaPreviewCanvas"));
+      const type = String(file.type || "").toLowerCase();
+      if (type.startsWith("video/")) {
+        previewCleanup = await startVideoMediaPreview(file, $("#mediaPreviewCanvas"), () => token === previewToken && isEditingMedia());
+      } else {
+        await renderMediaPreview(file, $("#mediaPreviewCanvas"));
+      }
       if (token !== previewToken) return;
       $("#mediaPreviewEmpty").classList.add("hidden");
     } catch (error) {
@@ -3569,6 +3785,8 @@ function renderMedia() {
     selectedMediaFile = file;
     $("#uploadMediaBtn").disabled = !isEditingMedia();
     $("#transferLog").textContent = t("mediaSelected", { name: file.name || t("resourceFile") });
+    setMediaSummary(await describeSelectedFile(file));
+    await updateClipControlBounds(file);
     $("#transferProgress").style.width = "0%";
     if (isEditingMedia()) {
       $("#mediaPreviewEmpty").textContent = t("mediaPreviewEmpty");
@@ -3584,13 +3802,40 @@ function renderMedia() {
     $("#mediaEditor").classList.toggle("hidden", !event.target.checked);
     $("#uploadMediaBtn").classList.toggle("hidden", !event.target.checked);
     $("#uploadMediaBtn").disabled = !event.target.checked || !selectedMediaFile;
-    if (event.target.checked) updatePreview();
+    if (event.target.checked) {
+      updateClipControlBounds(selectedMediaFile).then(updatePreview);
+    } else {
+      stopPreviewPlayback();
+    }
   });
   $("#mediaQualitySelect").addEventListener("change", (event) => {
     ensureAppSettings().mediaQuality = MEDIA_QUALITY_OPTIONS[event.target.value] ? event.target.value : "high";
     saveState();
     updatePreview();
   });
+  const updateClipValues = (event) => {
+    const settings = ensureAppSettings();
+    const maxSec = Math.max(0.1, clipDurationSec || 10);
+    let start = clamp(Number($("#mediaClipStartInput").value) || 0, 0, Math.max(0, maxSec - 0.1));
+    let end = clamp(Number($("#mediaClipEndInput").value) || Math.min(10, maxSec), 0.1, maxSec);
+    if (end <= start) {
+      end = Math.min(maxSec, start + 0.1);
+    }
+    if (end - start > 10) {
+      if (event?.target?.id === "mediaClipEndInput") start = Math.max(0, end - 10);
+      else end = Math.min(maxSec, start + 10);
+    }
+    $("#mediaClipStartInput").value = start.toFixed(1);
+    $("#mediaClipEndInput").value = end.toFixed(1);
+    settings.mediaClipStartMs = Math.round(start * 1000);
+    settings.mediaClipEndMs = Math.round(end * 1000);
+    $("#mediaClipStartValue").textContent = `${start.toFixed(1)}s`;
+    $("#mediaClipEndValue").textContent = `${end.toFixed(1)}s`;
+    saveState();
+    updatePreview();
+  };
+  $("#mediaClipStartInput").addEventListener("input", updateClipValues);
+  $("#mediaClipEndInput").addEventListener("input", updateClipValues);
   $("#mediaLayoutSelect").addEventListener("change", (event) => {
     ensureAppSettings().mediaLayout = event.target.value === "contain" ? "contain" : "cover";
     saveState();
@@ -3718,12 +3963,31 @@ function renderMedia() {
   previewCanvas.addEventListener("pointercancel", endPreviewDrag);
   const transferSelectedFile = async (file) => {
     if (!file) return;
+    state = { ...state, mediaBusy: true, currentRoute: "media" };
+    saveState();
+    renderNav();
+    setMediaControlsBusy(true);
     const qualityNote = isMotionMediaFile(file) ? `\n${t("mediaQuality")}：${mediaMotionQuality().label}` : "";
     $("#transferLog").textContent = `${t("processingMedia")}${qualityNote}`;
     $("#transferProgress").style.width = "0%";
     try {
       const prepared = await prepareMediaFile(file);
+      const transferSize = fileTransferBytes(prepared.bytes).totalLength;
+      setMediaSummary(t("mediaPreparedSummary", {
+        source: prepared.source || file.name || t("resourceFile"),
+        output: prepared.output || prepared.label,
+        fileSize: formatBytes(prepared.bytes.byteLength)
+      }));
       $("#transferLog").textContent = `${t("mediaPrepared", { name: prepared.fileName, size: formatBytes(prepared.bytes.byteLength) })}\n${prepared.label}`;
+      try {
+        const fs = await ble.readFileSystemInfo();
+        if (fs && Number.isFinite(fs.freeBytes)) {
+          const remainingAfter = fs.freeBytes - transferSize;
+          if (remainingAfter < FILE_TRANSFER_FREE_MARGIN_BYTES && !confirm(t("mediaStorageWarning", { size: formatBytes(transferSize), free: formatBytes(fs.freeBytes) }))) return;
+        }
+      } catch (error) {
+        if (!confirm(t("mediaStorageUnknown"))) return;
+      }
       await ble.transferBytes(prepared.bytes, prepared.fileName, FILE_TYPE.RESOURCE, (percent) => {
         $("#transferProgress").style.width = `${percent}%`;
         $("#transferLog").textContent = t("fileTransferring", { name: prepared.fileName, percent });
@@ -3736,18 +4000,27 @@ function renderMedia() {
       $("#transferLog").textContent += `\n${formatError(error, t("transferFailed"))}`;
       toast(formatError(error, t("transferFailed")));
     } finally {
+      state = { ...state, mediaBusy: false };
+      saveState();
+      renderNav();
+      setMediaControlsBusy(false);
       filePicker.value = "";
     }
   };
   $("#pickFileBtn").addEventListener("click", () => {
+    if (state.mediaBusy) return;
     filePicker.accept = "image/*,video/*,.gif";
     filePicker.onchange = () => selectMediaFile(filePicker.files[0]);
     filePicker.click();
   });
-  $("#uploadMediaBtn").addEventListener("click", () => transferSelectedFile(selectedMediaFile));
+  $("#uploadMediaBtn").addEventListener("click", () => {
+    if (state.mediaBusy) return;
+    transferSelectedFile(selectedMediaFile);
+  });
   const dropZone = $("#mediaDropZone");
   ["dragenter", "dragover"].forEach((eventName) => {
     dropZone.addEventListener(eventName, (event) => {
+      if (state.mediaBusy) return;
       event.preventDefault();
       dropZone.classList.add("active");
       dropZone.textContent = t("dropMediaActive");
@@ -3761,6 +4034,7 @@ function renderMedia() {
     });
   });
   dropZone.addEventListener("drop", (event) => {
+    if (state.mediaBusy) return;
     selectMediaFile(event.dataTransfer?.files?.[0]);
   });
   $("#cancelTransferBtn").addEventListener("click", () => {
@@ -3795,10 +4069,23 @@ function renderTags() {
         <button id="readTagsBtn" class="secondary-btn" type="button">${t("readDeviceTags")}</button>
         <button id="writeTagsBtn" class="primary-btn" type="button">${t("writeToDevice")}</button>
       </div>
-      <div class="tag-list" id="draftTags"></div>
+      <div class="summary-box">
+        <strong>${t("currentDeviceTags")}</strong>
+        <div class="tag-list" id="currentTags"></div>
+      </div>
+      <div class="summary-box">
+        <strong>${t("pendingDeviceTags")}</strong>
+        <div class="tag-list" id="draftTags"></div>
+      </div>
       <pre class="log" id="tagStatus">${t("tagHint")}</pre>
     </div>
   `;
+  let currentTags = device?.tagName ? [{
+    category: Number(device.tagCategoryId) || 0,
+    tagId: Number(device.tagId) || 0,
+    categoryName: device.tagCategory || t("category"),
+    tagName: device.tagName
+  }] : [];
   const drafts = [];
   const categorySelect = $("#tagCategory");
   const tagSearch = $("#tagSearch");
@@ -3810,7 +4097,8 @@ function renderTags() {
       : `<option value="" disabled>${t("noTagResults")}</option>`;
   };
   const renderDrafts = () => {
-    $("#draftTags").innerHTML = drafts.map((tag, index) => `<button class="tag-chip" data-remove-tag="${index}" type="button">${escapeHtml(tag.categoryName)} · ${escapeHtml(tag.tagName)}</button>`).join("") || `<span class="muted">${t("tagHint")}</span>`;
+    $("#currentTags").innerHTML = currentTags.map((tag) => `<span class="tag-chip">${escapeHtml(tag.categoryName)} · ${escapeHtml(tag.tagName)}</span>`).join("") || `<span class="muted">${t("tagsReadEmpty")}</span>`;
+    $("#draftTags").innerHTML = drafts.map((tag, index) => `<button class="tag-chip" data-remove-tag="${index}" type="button">${escapeHtml(tag.categoryName)} · ${escapeHtml(tag.tagName)}</button>`).join("") || `<span class="muted">${t("noPendingTags")}</span>`;
     $("#draftTags").querySelectorAll("[data-remove-tag]").forEach((button) => {
       button.addEventListener("click", () => {
         drafts.splice(Number(button.dataset.removeTag), 1);
@@ -3849,6 +4137,7 @@ function renderTags() {
       const result = await ble.readTagsFromAdvertisement(device);
       if (!result.found) throw new Error("未讀取到設備標籤廣播");
       const resolved = (result.tags || []).map((tag) => resolveTagPayload(categories, tag));
+      currentTags = resolved.slice();
       drafts.splice(0, drafts.length, ...resolved);
       renderDrafts();
       if (resolved[0]) {
@@ -3881,8 +4170,11 @@ function renderTags() {
   });
   $("#writeTagsBtn").addEventListener("click", async () => {
     try {
+      if (!confirm(t("confirmOverwriteTags"))) return;
       $("#tagStatus").textContent = t("writeToDevice");
       await ble.writeTags(drafts);
+      currentTags = drafts.slice();
+      renderDrafts();
       if (device && drafts[0]) {
         updateDevice(device.id, {
           tagCategory: drafts[0].categoryName,
@@ -4150,18 +4442,41 @@ function bindReceivedCards(options = {}) {
 
 function renderFirmware() {
   const deviceBeforeUpdate = getCurrentDevice();
+  const settings = ensureAppSettings();
+  const advancedVisible = Boolean(settings.firmwareAdvancedVisible);
+  const riskAccepted = Boolean(settings.firmwareRiskAccepted);
+  const currentVersion = getCurrentDevice()?.firmwareVersion || "--";
   view.innerHTML = `
     <div class="panel form">
       <h2>${t("firmwareUpgrade")}</h2>
       <p class="muted">${t("firmwareHelp")}</p>
-      <div class="actions">
-        <button id="pickFirmwareBtn" class="primary-btn" type="button">${t("pickFirmware")}</button>
+      <p class="muted">${t("firmwareCurrentVersion", { version: currentVersion })}</p>
+      <label class="switch-row">
+        <span><strong>${t("firmwareAdvanced")}</strong><br><span class="muted">${t("firmwareAdvancedHelp")}</span></span>
+        <input id="firmwareAdvancedToggle" class="switch" type="checkbox" ${advancedVisible ? "checked" : ""}>
+      </label>
+      <div id="firmwareAdvancedPanel" class="${advancedVisible ? "" : "hidden"}">
+        <label class="check-pill full"><input id="firmwareRiskAccepted" type="checkbox" ${riskAccepted ? "checked" : ""}>${t("firmwareConfirmOfficial")}</label>
+        <div class="actions">
+          <button id="pickFirmwareBtn" class="primary-btn" type="button" ${riskAccepted ? "" : "disabled"}>${t("pickFirmware")}</button>
+        </div>
       </div>
       <div class="progress"><span id="firmwareProgress"></span></div>
       <pre id="firmwareLog" class="log">${t("waitingFirmware")}</pre>
     </div>
   `;
+  $("#firmwareAdvancedToggle").addEventListener("change", (event) => {
+    ensureAppSettings().firmwareAdvancedVisible = event.target.checked;
+    saveState();
+    renderFirmware();
+  });
+  $("#firmwareRiskAccepted")?.addEventListener("change", (event) => {
+    ensureAppSettings().firmwareRiskAccepted = event.target.checked;
+    saveState();
+    $("#pickFirmwareBtn").disabled = !event.target.checked;
+  });
   $("#pickFirmwareBtn").addEventListener("click", () => {
+    if (!ensureAppSettings().firmwareRiskAccepted) return toast(t("firmwareRequireConfirm"));
     filePicker.accept = ".bin";
     filePicker.onchange = async () => {
       const file = filePicker.files[0];
@@ -4243,7 +4558,6 @@ function renderAppSettings() {
         </div>
         <div class="actions">
           <button id="saveAppSettingsBtn" class="primary-btn" type="button">${t("saveSettings")}</button>
-          <button id="exportStateBtn" class="secondary-btn" type="button">${t("exportData")}</button>
           <button id="resetStateBtn" class="danger-btn" type="button">${t("clearData")}</button>
         </div>
       </div>
@@ -4258,14 +4572,6 @@ function renderAppSettings() {
     ensureAppSettings().transferChunkDelay = Number($("#transferDelay").value) || 0;
     saveState();
     toast(t("settingsSaved"));
-  });
-  $("#exportStateBtn").addEventListener("click", () => {
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "monicard-web-state.json";
-    link.click();
-    URL.revokeObjectURL(link.href);
   });
   $("#resetStateBtn").addEventListener("click", () => {
     if (!confirm(t("confirmClear"))) return;

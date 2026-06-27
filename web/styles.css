@@ -451,6 +451,32 @@ select option {
   padding: 7px 10px;
 }
 
+.summary-box {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.34);
+}
+
+.summary-box strong {
+  font-size: 13px;
+}
+
+.summary-box span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.summary-box .tag-chip {
+  color: var(--text);
+}
+
+#mediaSummaryText {
+  white-space: pre-wrap;
+}
+
 .log {
   min-height: 150px;
   max-height: 280px;
@@ -488,6 +514,11 @@ select option {
   border-color: #facc15;
   color: #f8fafc;
   background: rgba(250, 204, 21, 0.12);
+}
+
+.drop-zone.disabled {
+  opacity: 0.52;
+  pointer-events: none;
 }
 
 .range-grid {
@@ -539,6 +570,12 @@ select option {
 
 .check-pill input {
   width: auto;
+}
+
+.check-pill.full {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
 }
 
 .color-field {
