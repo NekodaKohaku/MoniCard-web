@@ -67,6 +67,7 @@ const FILE_TRANSFER_FREE_MARGIN_BYTES = 50 * 1024;
 const RESERVED_STORAGE_BYTES = 3 * 1024 * 1024;
 const MOTION_MAX_DURATION_MS = 10000;
 const MOTION_MAX_FRAME_RATE = 20;
+const CAROUSEL_PRESETS = [3, 10, 30, 60];
 const MEDIA_QUALITY_OPTIONS = {
   high: { ratio: 26 / 30, label: "87%" },
   balanced: { ratio: 0.7, label: "70%" },
@@ -96,6 +97,7 @@ const i18n = {
     navSettings: "設備設定",
     navReceived: "收到的名片",
     navFirmware: "韌體",
+    navHelp: "說明",
     navAppSettings: "軟體設定",
     eyebrowConnected: "已連線",
     eyebrowWeb: "網頁版",
@@ -115,6 +117,9 @@ const i18n = {
     remove: "移除",
     noDeviceSelected: "還沒有選擇設備。",
     serialNumber: "序列號",
+    bluetoothId: "藍牙 ID",
+    deviceModel: "設備型號",
+    hardwareVersion: "硬體版本",
     battery: "電量",
     firmwareVersion: "韌體",
     storage: "儲存空間",
@@ -133,6 +138,9 @@ const i18n = {
     receivedFeatureDesc: "同步附近設備名片",
     firmwareFeature: "韌體",
     firmwareFeatureDesc: "上傳本機更新檔",
+    copyFirmwareQueryData: "複製韌體查詢資料",
+    firmwareQueryDataCopied: "已複製韌體查詢資料",
+    firmwareQueryDataCopyFailed: "複製失敗，請確認瀏覽器允許剪貼簿權限。",
     cardContent: "名片內容",
     maxBytes: "最多 {count} bytes",
     readFromDevice: "從設備讀取",
@@ -143,7 +151,9 @@ const i18n = {
     defaultCard: "MoniCard\nQQ：12345678\n我是 Monica",
     mediaTransfer: "素材傳輸",
     mediaHelp: "上傳想在設備上顯示的照片、短影片或 GIF。",
-    mediaProcessHelp: "系統會自動調整尺寸與格式；影片與 GIF 預設取前 10 秒製作成設備素材。開啟上傳前編輯後，可以改選任意 10 秒內片段。建議使用直式 3:4 素材。",
+    mediaProcessHelp: "系統會自動調整尺寸與格式；圖片會輸出為 240×320 PNG，影片與 GIF 會輸出為 240×320、20fps、無聲音的 MJPEG MP4。開啟上傳前編輯後，可以改選任意 10 秒內片段。",
+    mediaOfficialNote: "素材會傳到設備本機並離線展示；目前無法從網頁讀取設備正在播放的內容，也無法列出或刪除已上傳素材。",
+    mediaKeepForeground: "傳輸期間請保持此頁面在前景，避免切換分頁、縮到背景、讓電腦睡眠或移動設備；macOS 可能會比較積極暫停背景藍牙傳輸。",
     mediaQuality: "素材品質",
     mediaQualityHigh: "畫質優先（約 87%，預設）",
     mediaQualityBalanced: "平衡（約 70%）",
@@ -191,6 +201,7 @@ const i18n = {
     fileTypeHelp: "支援 JPG、PNG、WebP、常見影片格式與 GIF。",
     resourceFile: "圖片 / 影片 / GIF",
     pickAndTransfer: "選擇檔案",
+    pickCamera: "使用相機",
     uploadSelectedMedia: "上傳素材",
     mediaPreview: "預覽",
     mediaPreviewEmpty: "選擇圖片、影片或 GIF 後會在這裡預覽；可直接拖曳畫面調整位置",
@@ -225,6 +236,9 @@ const i18n = {
     tagReadUnsupported: "此瀏覽器不支援讀取當前標籤設定；但仍可手動選擇並寫入覆蓋標籤設定。",
     tagReadFailed: "讀取設備標籤失敗",
     tagsWrittenHint: "標籤已寫入設備，稍等 1～2 秒後廣播會生效。",
+    tagsConfirmingBroadcast: "標籤已寫入設備，正在嘗試讀取廣播確認是否生效…",
+    tagsConfirmedBroadcast: "標籤已寫入設備，並已確認廣播更新為 {count} 個標籤。",
+    tagsConfirmReadFailed: "標籤已寫入設備；此瀏覽器無法再次讀取廣播確認，稍等 1～2 秒後通常會生效。",
     deviceSwitches: "設備開關",
     readSettings: "讀取設備設定",
     buzzer: "蜂鳴器",
@@ -242,6 +256,7 @@ const i18n = {
     videoCarousel: "影片輪播",
     carouselSeconds: "輪播間隔",
     carouselEnabled: "啟用輪播",
+    carouselPresetHelp: "官方新版提供 3 / 10 / 30 / 60 秒四段切換。",
     readCarousel: "讀取輪播",
     saveCarousel: "儲存輪播",
     autoReadingSettings: "正在自動讀取設備設定",
@@ -257,6 +272,7 @@ const i18n = {
     deleteReceivedCardFailed: "刪除名片失敗",
     firmwareUpgrade: "韌體升級",
     firmwareHelp: "請選擇可信任的韌體更新檔，並確認設備電量充足後再開始。更新完成並重新連線前，請停留在此頁面。",
+    firmwareOfficialFlow: "官方小程序可線上檢查對應韌體；Web 版目前只保留本機 .bin 入口。請只使用已確認對應此設備的官方韌體檔。",
     pickFirmware: "選擇韌體檔",
     firmwareAdvanced: "進階韌體更新",
     firmwareAdvancedHelp: "僅在你確定檔案來自官方且對應此設備時使用。",
@@ -283,6 +299,17 @@ const i18n = {
     clearData: "清空網頁資料",
     migrationNotes: "使用說明",
     migrationHelp: "請使用 Chrome 或 Edge，並透過 HTTPS 網址開啟。首次連線設備時，瀏覽器會要求你手動選擇並授權。",
+    helpTitle: "使用說明",
+    helpMediaTitle: "素材上傳",
+    helpMediaBody: "支援 JPG、PNG、WebP、GIF 與常見影片。圖片會裁切為 240×320 PNG；影片與 GIF 會轉成 240×320、20fps、無聲音的 MJPEG MP4，最長 10 秒。上傳後設備會自行展示，但 Web 版無法讀取目前播放內容，也無法列出或刪除設備內素材。",
+    helpControlsTitle: "設備控制",
+    helpControlsBody: "同好感應、蜂鳴器、震動、同好感應燈光與背面氛圍燈可從設備設定頁調整。關閉同好感應後，設備仍會廣播你的名片與標籤，只是不再主動接收附近同好提醒。",
+    helpCarouselTitle: "輪播",
+    helpCarouselBody: "官方新版提供 3、10、30、60 秒四段切換。關閉輪播時，設備會停留在目前素材；如果素材上傳成功但沒有顯示，可以嘗試調整輪播或在設備端切換素材。",
+    helpFirmwareTitle: "韌體更新",
+    helpFirmwareBody: "韌體更新約需數分鐘。開始後請保持此頁面開啟，不要切換頁面、關閉瀏覽器、讓電腦睡眠或關閉設備電源。更新完成後等待約 10 秒，再按設備電源鍵開機，Web 版會嘗試重新連線驗證。",
+    helpStorageTitle: "容量與刪除",
+    helpStorageBody: "設備容量顯示會保留安全餘量，避免上傳時把空間塞滿。官方小程序也不能列出或刪除已上傳素材；v1.3.0 以上固件可在設備端進行素材排序。",
     unnamedDevice: "設備名稱",
     online: "在線",
     disconnected: "已中斷連線",
@@ -348,6 +375,7 @@ const i18n = {
     navSettings: "Device Settings",
     navReceived: "Received Cards",
     navFirmware: "Firmware",
+    navHelp: "Help",
     navAppSettings: "App Settings",
     eyebrowConnected: "Connected",
     eyebrowWeb: "Web app",
@@ -367,6 +395,9 @@ const i18n = {
     remove: "Remove",
     noDeviceSelected: "No device selected yet.",
     serialNumber: "Serial",
+    bluetoothId: "Bluetooth ID",
+    deviceModel: "Device model",
+    hardwareVersion: "Hardware version",
     battery: "Battery",
     firmwareVersion: "Firmware",
     storage: "Storage",
@@ -385,6 +416,9 @@ const i18n = {
     receivedFeatureDesc: "Sync digital business cards from nearby devices",
     firmwareFeature: "Firmware",
     firmwareFeatureDesc: "Upload a local update file",
+    copyFirmwareQueryData: "Copy firmware query data",
+    firmwareQueryDataCopied: "Firmware query data copied",
+    firmwareQueryDataCopyFailed: "Copy failed. Check that clipboard permission is allowed.",
     cardContent: "Business card info",
     maxBytes: "Up to {count} bytes",
     readFromDevice: "Read from device",
@@ -395,7 +429,9 @@ const i18n = {
     defaultCard: "MoniCard\nQQ: 12345678\nHi, I'm Monica.",
     mediaTransfer: "Asset upload",
     mediaHelp: "Upload images, videos, or GIFs to show on your device.",
-    mediaProcessHelp: "Files are automatically resized and prepared for the display. Videos and GIFs use the first 10 seconds by default. Turn on editing to choose any segment up to 10 seconds. Portrait 3:4 assets work best.",
+    mediaProcessHelp: "Files are automatically resized and prepared for the display. Images are exported as 240×320 PNG. Videos and GIFs are exported as 240×320, 20 fps, silent MJPEG MP4. Turn on editing to choose any segment up to 10 seconds.",
+    mediaOfficialNote: "Assets are stored locally on the device for offline playback. The web app cannot read what is currently playing, list stored assets, or delete uploaded assets.",
+    mediaKeepForeground: "Keep this page in the foreground during upload. Avoid switching tabs, sending the browser to the background, letting the computer sleep, or moving the device away. macOS may pause background Bluetooth transfers more aggressively.",
     mediaQuality: "Asset quality",
     mediaQualityHigh: "Quality first (about 87%, default)",
     mediaQualityBalanced: "Balanced (about 70%)",
@@ -443,6 +479,7 @@ const i18n = {
     fileTypeHelp: "Supports JPG, PNG, WebP, common video formats, and GIF.",
     resourceFile: "Image / video / GIF",
     pickAndTransfer: "Choose file",
+    pickCamera: "Use camera",
     uploadSelectedMedia: "Upload asset",
     mediaPreview: "Preview",
     mediaPreviewEmpty: "Choose an image, video, or GIF to preview it here. Drag the preview to adjust framing.",
@@ -477,6 +514,9 @@ const i18n = {
     tagReadUnsupported: "This browser cannot read the current tag settings. You can still choose tags manually and overwrite the tag settings.",
     tagReadFailed: "Couldn’t read device tags",
     tagsWrittenHint: "Tags written. The broadcast should update in 1-2 seconds.",
+    tagsConfirmingBroadcast: "Tags written. Checking the Bluetooth broadcast to confirm the update…",
+    tagsConfirmedBroadcast: "Tags written and confirmed in the broadcast: {count} tags.",
+    tagsConfirmReadFailed: "Tags written. This browser could not read the broadcast again to confirm it, but it should update in 1-2 seconds.",
     deviceSwitches: "Device Settings",
     readSettings: "Read device settings",
     buzzer: "Buzzer",
@@ -494,6 +534,7 @@ const i18n = {
     videoCarousel: "Video carousel",
     carouselSeconds: "Carousel interval",
     carouselEnabled: "Enable carousel",
+    carouselPresetHelp: "The official app uses four intervals: 3, 10, 30, and 60 seconds.",
     readCarousel: "Read carousel",
     saveCarousel: "Save carousel",
     autoReadingSettings: "Reading device settings automatically",
@@ -509,6 +550,7 @@ const i18n = {
     deleteReceivedCardFailed: "Couldn’t delete card",
     firmwareUpgrade: "Firmware update",
     firmwareHelp: "Choose a trusted firmware update file, and make sure the device has enough battery before starting. Stay on this page until the update reconnects.",
+    firmwareOfficialFlow: "The official mini program can check matching firmware online. The web app currently keeps only the local .bin update entry. Use only an official firmware file confirmed for this device.",
     pickFirmware: "Choose firmware file",
     firmwareAdvanced: "Advanced firmware update",
     firmwareAdvancedHelp: "Use only when you are sure the file is official and made for this device.",
@@ -535,6 +577,17 @@ const i18n = {
     clearData: "Clear web data",
     migrationNotes: "Usage notes",
     migrationHelp: "Use Chrome or Edge and open the app from an HTTPS address. The browser will ask you to choose and authorize the device the first time you connect.",
+    helpTitle: "Help",
+    helpMediaTitle: "Asset upload",
+    helpMediaBody: "Supports JPG, PNG, WebP, GIF, and common video formats. Images are cropped to 240×320 PNG. Videos and GIFs are converted to silent 240×320 MJPEG MP4 at 20 fps, up to 10 seconds. After upload, the device plays assets locally; the web app cannot read the current playback, list stored assets, or delete uploaded assets.",
+    helpControlsTitle: "Device controls",
+    helpControlsBody: "Interest radar, buzzer, vibration, light cues, and rear ambient light are controlled from Device Settings. Turning off Interest Radar stops this device from receiving nearby match alerts, but it still broadcasts your card and tags.",
+    helpCarouselTitle: "Carousel",
+    helpCarouselBody: "The official app uses four intervals: 3, 10, 30, and 60 seconds. When carousel is off, the device stays on the current asset. If an uploaded asset does not appear, try changing the carousel setting or switching assets on the device.",
+    helpFirmwareTitle: "Firmware update",
+    helpFirmwareBody: "Firmware update takes a few minutes. Keep this page open after starting; do not switch pages, close the browser, let the computer sleep, or power off the device. After upload finishes, wait about 10 seconds, press the power button, and the web app will try to reconnect and verify.",
+    helpStorageTitle: "Storage and deletion",
+    helpStorageBody: "Storage display keeps a safety margin so uploads do not fill the device completely. The official mini program also cannot list or delete uploaded assets. Firmware v1.3.0 and later can sort assets on the device.",
     unnamedDevice: "Device name",
     online: "Online",
     disconnected: "Disconnected",
@@ -600,6 +653,7 @@ const i18n = {
     navSettings: "端末設定",
     navReceived: "受け取った名刺",
     navFirmware: "ファームウェア",
+    navHelp: "ヘルプ",
     navAppSettings: "アプリ設定",
     eyebrowConnected: "接続中",
     eyebrowWeb: "Web 版",
@@ -619,6 +673,9 @@ const i18n = {
     remove: "削除",
     noDeviceSelected: "端末が選択されていません。",
     serialNumber: "シリアル",
+    bluetoothId: "Bluetooth ID",
+    deviceModel: "端末モデル",
+    hardwareVersion: "ハードウェア",
     battery: "バッテリー",
     firmwareVersion: "ファームウェア",
     storage: "保存容量",
@@ -637,6 +694,9 @@ const i18n = {
     receivedFeatureDesc: "近くの端末から受け取った名刺を同期",
     firmwareFeature: "ファームウェア",
     firmwareFeatureDesc: "ローカルの更新ファイルをアップロード",
+    copyFirmwareQueryData: "ファームウェア照会データをコピー",
+    firmwareQueryDataCopied: "ファームウェア照会データをコピーしました",
+    firmwareQueryDataCopyFailed: "コピーできませんでした。ブラウザのクリップボード権限を確認してください。",
     cardContent: "名刺内容",
     maxBytes: "最大 {count} バイト",
     readFromDevice: "端末から読み込み",
@@ -647,7 +707,9 @@ const i18n = {
     defaultCard: "MoniCard\nQQ：12345678\nMonicaです",
     mediaTransfer: "素材アップロード",
     mediaHelp: "端末に表示したい画像、動画、GIFをアップロードできます。",
-    mediaProcessHelp: "表示に合わせてサイズと形式を自動調整します。動画とGIFは初期設定では先頭10秒を端末用素材にします。アップロード前編集をオンにすると、任意の最大10秒を選べます。縦長の3:4素材がおすすめです。",
+    mediaProcessHelp: "表示に合わせてサイズと形式を自動調整します。画像は 240×320 PNG、動画とGIFは 240×320・20fps・音声なしの MJPEG MP4 に変換します。アップロード前編集をオンにすると、任意の最大10秒を選べます。",
+    mediaOfficialNote: "素材は端末本体に保存され、オフラインで表示されます。Web版では現在再生中の内容、保存済み素材の一覧、アップロード済み素材の削除はできません。",
+    mediaKeepForeground: "アップロード中はこのページを前面に表示したままにしてください。タブの切り替え、ブラウザのバックグラウンド化、PCのスリープ、端末を離す操作は避けてください。macOSではバックグラウンドのBluetooth転送が停止しやすい場合があります。",
     mediaQuality: "素材品質",
     mediaQualityHigh: "画質優先（約87%、初期設定）",
     mediaQualityBalanced: "バランス（約70%）",
@@ -695,6 +757,7 @@ const i18n = {
     fileTypeHelp: "JPG、PNG、WebP、主要な動画形式、GIFに対応しています。",
     resourceFile: "画像 / 動画 / GIF",
     pickAndTransfer: "ファイルを選択",
+    pickCamera: "カメラで撮影",
     uploadSelectedMedia: "素材をアップロード",
     mediaPreview: "プレビュー",
     mediaPreviewEmpty: "画像、動画、GIFを選ぶとここにプレビューが表示されます。プレビューをドラッグして位置を調整できます。",
@@ -729,6 +792,9 @@ const i18n = {
     tagReadUnsupported: "このブラウザでは現在のタグ設定を読み取れません。手動でタグを選択し、タグ設定を上書きできます。",
     tagReadFailed: "端末のタグを読み込めませんでした",
     tagsWrittenHint: "タグを書き込みました。1～2秒後に発信内容へ反映されます。",
+    tagsConfirmingBroadcast: "タグを書き込みました。Bluetooth発信を読み取り、反映を確認しています…",
+    tagsConfirmedBroadcast: "タグを書き込み、発信内容が {count} 個のタグに更新されたことを確認しました。",
+    tagsConfirmReadFailed: "タグを書き込みました。このブラウザでは発信内容を再読み取り確認できませんでしたが、通常は1～2秒後に反映されます。",
     deviceSwitches: "端末設定",
     readSettings: "設定を読み込み",
     buzzer: "ブザー",
@@ -746,6 +812,7 @@ const i18n = {
     videoCarousel: "動画カルーセル",
     carouselSeconds: "切替間隔",
     carouselEnabled: "カルーセルを有効にする",
+    carouselPresetHelp: "公式アプリと同じく、3 / 10 / 30 / 60 秒の4段階です。",
     readCarousel: "設定を読み込み",
     saveCarousel: "保存",
     autoReadingSettings: "端末設定を自動で読み込んでいます",
@@ -761,6 +828,7 @@ const i18n = {
     deleteReceivedCardFailed: "名刺を削除できませんでした",
     firmwareUpgrade: "ファームウェア更新",
     firmwareHelp: "信頼できるファームウェア更新ファイルを選び、端末の電池残量を十分に確保してから開始してください。更新後の再接続が完了するまで、このページを開いたままにしてください。",
+    firmwareOfficialFlow: "公式ミニプログラムでは対応ファームウェアをオンラインで確認できます。Web版では現在、ローカルの .bin 更新のみ対応しています。必ずこの端末に対応した公式ファイルを使用してください。",
     pickFirmware: "ファームウェアファイルを選択",
     firmwareAdvanced: "高度なファームウェア更新",
     firmwareAdvancedHelp: "公式かつこの端末に対応したファイルだと確認できる場合のみ使用してください。",
@@ -787,6 +855,17 @@ const i18n = {
     clearData: "Web データを消去",
     migrationNotes: "ご利用メモ",
     migrationHelp: "Chrome または Edge で、HTTPS のURLから開いてください。初回接続時は、ブラウザ上で端末を選択して許可する必要があります。",
+    helpTitle: "ヘルプ",
+    helpMediaTitle: "素材アップロード",
+    helpMediaBody: "JPG、PNG、WebP、GIF、主要な動画形式に対応しています。画像は 240×320 PNG、動画とGIFは最大10秒・20fps・音声なしの 240×320 MJPEG MP4 に変換されます。アップロード後は端末本体で再生され、Web版では現在の再生内容、保存済み素材一覧、素材削除はできません。",
+    helpControlsTitle: "端末設定",
+    helpControlsBody: "動的感知、ブザー、振動、ライト通知、背面ライトは端末設定から変更できます。動的感知をオフにすると近くのマッチ通知は受け取りませんが、名刺とタグの発信は継続されます。",
+    helpCarouselTitle: "カルーセル",
+    helpCarouselBody: "公式アプリと同じく、3、10、30、60秒の4段階です。カルーセルをオフにすると現在の素材に留まります。アップロード成功後に表示されない場合は、カルーセル設定や端末側の素材切替を試してください。",
+    helpFirmwareTitle: "ファームウェア更新",
+    helpFirmwareBody: "ファームウェア更新には数分かかります。開始後はページを切り替えず、ブラウザを閉じず、PCをスリープさせず、端末の電源を切らないでください。アップロード完了後、約10秒待って電源ボタンを押すと、Web版が再接続と確認を試みます。",
+    helpStorageTitle: "容量と削除",
+    helpStorageBody: "容量表示には安全マージンを含め、端末の空き容量を使い切らないようにしています。公式ミニプログラムでもアップロード済み素材の一覧表示や削除はできません。v1.3.0 以降のファームウェアでは端末側で素材の並び替えができます。",
     unnamedDevice: "端末名",
     online: "オンライン",
     disconnected: "切断済み",
@@ -1297,6 +1376,7 @@ const routes = [
   ["tags", "navTags", renderTags],
   ["settings", "navSettings", renderDeviceSettings],
   ["firmware", "navFirmware", renderFirmware],
+  ["help", "navHelp", renderHelp],
   ["appsettings", "navAppSettings", renderAppSettings]
 ];
 
@@ -1354,6 +1434,7 @@ let toastTimer = null;
 let lastRenderedRoute = "";
 let receivedCardsSyncing = false;
 let detailAutoRefreshing = false;
+let routeAutoRefreshTimer = null;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -1458,6 +1539,10 @@ function upsertDevice(device) {
     connected: false,
     firmwareVersion: device.firmwareVersion || "--",
     latestFirmwareVersion: device.latestFirmwareVersion || "--",
+    model: device.model || device.deviceModel || "MoniCard",
+    deviceModel: device.deviceModel || device.model || "MoniCard",
+    hardwareVersion: device.hardwareVersion || device.hardware || device.hwVersion || "default",
+    hardware: device.hardware || device.hardwareVersion || device.hwVersion || "default",
     cardPreview: device.cardPreview || "",
     tagCategory: device.tagCategory || "",
     tagName: device.tagName || "",
@@ -1475,6 +1560,36 @@ function upsertDevice(device) {
 function updateDevice(id, patch) {
   state.devices = state.devices.map((item) => item.id === id || item.sn === id ? { ...item, ...patch } : item);
   saveState();
+}
+
+function firmwareQueryData(device) {
+  return {
+    model: device?.model || device?.deviceModel || "MoniCard",
+    hardware: device?.hardwareVersion || device?.hardware || device?.hwVersion || "default",
+    currentVersion: device?.firmwareVersion && device.firmwareVersion !== "--" ? device.firmwareVersion : "",
+    sn: device?.sn || "",
+    bleDeviceId: device?.bleDeviceId || "",
+    name: device?.name || "MoniCard"
+  };
+}
+
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard?.writeText && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    if (!document.execCommand("copy")) throw new Error("copy failed");
+  } finally {
+    textarea.remove();
+  }
 }
 
 function bytesToHex(bytes) {
@@ -3279,10 +3394,22 @@ function render() {
     renderNav();
     renderSupport();
     route[2]({ enteringRoute });
+    scheduleRouteAutoRefresh(route[0]);
     lastRenderedRoute = route[0];
   } catch (error) {
     showRenderError(error);
   }
+}
+
+function scheduleRouteAutoRefresh(routeKey) {
+  clearInterval(routeAutoRefreshTimer);
+  routeAutoRefreshTimer = null;
+  if (!["detail", "settings"].includes(routeKey)) return;
+  routeAutoRefreshTimer = setInterval(() => {
+    if (!["detail", "settings"].includes(state.currentRoute)) return;
+    if (state.mediaBusy || state.firmwareBusy || !ble.device?.gatt?.connected) return;
+    refreshCurrentDevice(true, { quietErrors: true });
+  }, 60000);
 }
 
 function showRenderError(error) {
@@ -3423,6 +3550,9 @@ function renderDetail(options = {}) {
         <h2>${escapeHtml(device.name || "MoniCard")}</h2>
         <div class="stats">
           <div class="stat"><span>${t("serialNumber")}</span><strong>${escapeHtml(device.sn || "--")}</strong></div>
+          <div class="stat"><span>${t("bluetoothId")}</span><strong>${escapeHtml(device.bleDeviceId || "--")}</strong></div>
+          <div class="stat"><span>${t("deviceModel")}</span><strong>${escapeHtml(device.model || device.deviceModel || "MoniCard")}</strong></div>
+          <div class="stat"><span>${t("hardwareVersion")}</span><strong>${escapeHtml(device.hardwareVersion || device.hardware || device.hwVersion || "default")}</strong></div>
           <div class="stat"><span>${t("battery")}</span><strong>${escapeHtml(String(device.battery ?? "--"))}%</strong></div>
           <div class="stat"><span>${t("firmwareVersion")}</span><strong>${escapeHtml(device.firmwareVersion || "--")}</strong></div>
         </div>
@@ -3430,6 +3560,7 @@ function renderDetail(options = {}) {
         <div class="progress"><span style="width:${Math.max(0, Math.min(Number(device.storagePercent) || 0, 100))}%"></span></div>
         <div class="actions" style="margin-top:16px">
           <button id="refreshDeviceBtn" class="primary-btn" type="button">${t("refreshDeviceStatus")}</button>
+          <button id="copyFirmwareQueryBtn" class="secondary-btn" type="button">${t("copyFirmwareQueryData")}</button>
           <button id="renameDeviceBtn" class="secondary-btn" type="button">${t("saveName")}</button>
         </div>
         <p id="detailStatus" class="muted">${options.enteringRoute && (ble.connection || device.bleDeviceId) ? t("autoRefreshingDevice") : ""}</p>
@@ -3448,6 +3579,14 @@ function renderDetail(options = {}) {
     </div>
   `;
   $("#refreshDeviceBtn").addEventListener("click", () => refreshCurrentDevice());
+  $("#copyFirmwareQueryBtn").addEventListener("click", async () => {
+    try {
+      await copyTextToClipboard(JSON.stringify(firmwareQueryData(device), null, 2));
+      toast(t("firmwareQueryDataCopied"));
+    } catch (error) {
+      toast(t("firmwareQueryDataCopyFailed"));
+    }
+  });
   $("#renameDeviceBtn").addEventListener("click", () => {
     updateDevice(device.id, { name: $("#deviceNameInput").value.trim() || "MoniCard" });
     toast(t("nameSaved"));
@@ -3558,6 +3697,8 @@ function renderMedia() {
       <h2>${t("mediaTransfer")}</h2>
       <p class="muted">${t("mediaHelp")}</p>
       <p class="muted">${t("mediaProcessHelp")}</p>
+      <p class="muted">${t("mediaOfficialNote")}</p>
+      <p class="muted">${t("mediaKeepForeground")}</p>
       <div class="field">
         <label>${t("fileType")}</label>
         <input value="${t("resourceFile")}" disabled>
@@ -3676,6 +3817,7 @@ function renderMedia() {
       </div>
       <div class="actions">
         <button id="pickFileBtn" class="primary-btn" type="button">${t("pickAndTransfer")}</button>
+        <button id="cameraFileBtn" class="secondary-btn" type="button">${t("pickCamera")}</button>
         <button id="uploadMediaBtn" class="secondary-btn ${editBeforeUpload ? "" : "hidden"}" type="button" disabled>${t("uploadSelectedMedia")}</button>
         <button id="cancelTransferBtn" class="danger-btn" type="button" disabled>${t("cancelTransfer")}</button>
       </div>
@@ -3695,6 +3837,7 @@ function renderMedia() {
   const isEditingMedia = () => Boolean(ensureAppSettings().mediaEditBeforeUpload);
   const setMediaControlsBusy = (busy) => {
     $("#pickFileBtn").disabled = busy;
+    $("#cameraFileBtn").disabled = busy;
     $("#uploadMediaBtn").disabled = busy || !isEditingMedia() || !selectedMediaFile;
     $("#cancelTransferBtn").disabled = !busy;
     $("#connectBtn").disabled = busy;
@@ -4010,6 +4153,16 @@ function renderMedia() {
   $("#pickFileBtn").addEventListener("click", () => {
     if (state.mediaBusy) return;
     filePicker.accept = "image/*,video/*,.gif";
+    filePicker.removeAttribute("capture");
+    filePicker.value = "";
+    filePicker.onchange = () => selectMediaFile(filePicker.files[0]);
+    filePicker.click();
+  });
+  $("#cameraFileBtn").addEventListener("click", () => {
+    if (state.mediaBusy) return;
+    filePicker.accept = "image/*,video/*";
+    filePicker.setAttribute("capture", "environment");
+    filePicker.value = "";
     filePicker.onchange = () => selectMediaFile(filePicker.files[0]);
     filePicker.click();
   });
@@ -4192,7 +4345,21 @@ function renderTags() {
           statusLabel: t("settingsSynced")
         });
       }
-      $("#tagStatus").textContent = t("tagsWrittenHint");
+      $("#tagStatus").textContent = t("tagsConfirmingBroadcast");
+      try {
+        const result = await ble.readTagsFromAdvertisement(device, { expectedCount: drafts.length, timeout: 3500 });
+        const resolved = result.found ? (result.tags || []).map((tag) => resolveTagPayload(categories, tag)) : [];
+        if (result.found) {
+          currentTags = resolved.slice();
+          drafts.splice(0, drafts.length, ...resolved);
+          renderDrafts();
+          $("#tagStatus").textContent = t("tagsConfirmedBroadcast", { count: resolved.length });
+        } else {
+          $("#tagStatus").textContent = t("tagsWrittenHint");
+        }
+      } catch {
+        $("#tagStatus").textContent = t("tagsConfirmReadFailed");
+      }
       toast(t("tagsWritten"));
     } catch (error) {
       $("#tagStatus").textContent = formatError(error, t("writeFailed"));
@@ -4212,9 +4379,9 @@ function tagId(tag, index) {
 }
 
 function renderDeviceSettings() {
-  const carouselDuration = Math.max(0, Math.min(Number(getCurrentDevice()?.carouselDuration) || 0, 60));
+  const carouselDuration = normalizeCarouselSeconds(getCurrentDevice()?.carouselDuration || 0);
   const carouselEnabled = carouselDuration > 0;
-  const carouselSliderValue = carouselEnabled ? carouselDuration : 3;
+  const carouselValue = carouselEnabled ? carouselDuration : 10;
   const controls = [
     ["disableBuzzer", t("buzzer"), t("buzzerDesc")],
     ["disableVibration", t("vibration"), t("vibrationDesc")],
@@ -4242,11 +4409,11 @@ function renderDeviceSettings() {
             <input id="carouselToggle" class="switch" type="checkbox" ${carouselEnabled ? "checked" : ""}>
           </label>
           <div id="carouselSliderWrap" class="carousel-slider ${carouselEnabled ? "" : "hidden"}">
-            <div class="range-grid compact">
-              <span>${t("carouselSeconds")}</span>
-              <input id="carouselInput" type="range" min="1" max="60" value="${carouselSliderValue}">
-              <strong id="carouselValue">${carouselSliderValue}s</strong>
+            <label class="field-label">${t("carouselSeconds")}</label>
+            <div class="segmented" id="carouselPresetGroup">
+              ${CAROUSEL_PRESETS.map((seconds) => `<button class="${carouselValue === seconds ? "active" : ""}" data-carousel-preset="${seconds}" type="button">${seconds}s</button>`).join("")}
             </div>
+            <span class="muted">${t("carouselPresetHelp")}</span>
           </div>
         </div>
       </div>
@@ -4275,16 +4442,15 @@ function renderDeviceSettings() {
     });
   });
   $("#carouselToggle").addEventListener("change", async (event) => {
-    const nextSeconds = event.target.checked ? Math.max(1, Math.min(Number($("#carouselInput").value) || 3, 60)) : 0;
+    const nextSeconds = event.target.checked ? carouselValue : 0;
     updateCarouselControls(nextSeconds);
     await saveCarouselSeconds(nextSeconds, event.target);
   });
-  $("#carouselInput").addEventListener("input", (event) => {
-    $("#carouselValue").textContent = `${event.target.value}s`;
-  });
-  $("#carouselInput").addEventListener("change", async (event) => {
-    if (!$("#carouselToggle").checked) return;
-    await saveCarouselSeconds(Number(event.target.value) || 1);
+  view.querySelectorAll("[data-carousel-preset]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      if (!$("#carouselToggle").checked) return;
+      await saveCarouselSeconds(Number(button.dataset.carouselPreset) || 10);
+    });
   });
   if (ble.connection) setTimeout(() => readSettingsAndCarousel({ notify: false }), 0);
 }
@@ -4317,21 +4483,26 @@ function applyDeviceSettingsToSwitches(settings) {
 }
 
 function updateCarouselControls(seconds) {
-  const normalized = Math.max(0, Math.min(Number(seconds) || 0, 60));
-  const value = normalized > 0 ? normalized : 3;
-  const input = $("#carouselInput");
+  const normalized = normalizeCarouselSeconds(seconds);
+  const value = normalized > 0 ? normalized : 10;
   const toggle = $("#carouselToggle");
-  const label = $("#carouselValue");
   const wrap = $("#carouselSliderWrap");
-  if (input) input.value = value;
   if (toggle) toggle.checked = normalized > 0;
-  if (label) label.textContent = `${value}s`;
   if (wrap) wrap.classList.toggle("hidden", normalized <= 0);
+  view.querySelectorAll("[data-carousel-preset]").forEach((button) => {
+    button.classList.toggle("active", Number(button.dataset.carouselPreset) === value);
+  });
+}
+
+function normalizeCarouselSeconds(seconds) {
+  const value = Math.max(0, Number(seconds) || 0);
+  if (value <= 0) return 0;
+  return CAROUSEL_PRESETS.reduce((best, item) => Math.abs(item - value) < Math.abs(best - value) ? item : best, CAROUSEL_PRESETS[0]);
 }
 
 async function saveCarouselSeconds(seconds, toggleElement) {
   try {
-    const normalized = Math.max(0, Math.min(Number(seconds) || 0, 60));
+    const normalized = normalizeCarouselSeconds(seconds);
     await ble.writeCarousel(normalized);
     const device = getCurrentDevice();
     if (device) updateDevice(device.id, { carouselDuration: normalized });
@@ -4450,6 +4621,7 @@ function renderFirmware() {
     <div class="panel form">
       <h2>${t("firmwareUpgrade")}</h2>
       <p class="muted">${t("firmwareHelp")}</p>
+      <p class="muted">${t("firmwareOfficialFlow")}</p>
       <p class="muted">${t("firmwareCurrentVersion", { version: currentVersion })}</p>
       <label class="switch-row">
         <span><strong>${t("firmwareAdvanced")}</strong><br><span class="muted">${t("firmwareAdvancedHelp")}</span></span>
@@ -4478,6 +4650,7 @@ function renderFirmware() {
   $("#pickFirmwareBtn").addEventListener("click", () => {
     if (!ensureAppSettings().firmwareRiskAccepted) return toast(t("firmwareRequireConfirm"));
     filePicker.accept = ".bin";
+    filePicker.removeAttribute("capture");
     filePicker.onchange = async () => {
       const file = filePicker.files[0];
       if (!file) return;
@@ -4534,6 +4707,29 @@ async function verifyFirmwareAfterUpdate(deviceBeforeUpdate) {
   if (log) log.textContent = t("firmwareVerifyFailed");
   toast(t("firmwareVerifyFailed"));
   return null;
+}
+
+function renderHelp() {
+  const items = [
+    [t("helpMediaTitle"), t("helpMediaBody")],
+    [t("helpControlsTitle"), t("helpControlsBody")],
+    [t("helpCarouselTitle"), t("helpCarouselBody")],
+    [t("helpFirmwareTitle"), t("helpFirmwareBody")],
+    [t("helpStorageTitle"), t("helpStorageBody")]
+  ];
+  view.innerHTML = `
+    <div class="panel">
+      <h2>${t("helpTitle")}</h2>
+    </div>
+    <div class="grid">
+      ${items.map(([title, body]) => `
+        <article class="card help-card">
+          <h2>${escapeHtml(title)}</h2>
+          <p class="muted">${escapeHtml(body)}</p>
+        </article>
+      `).join("")}
+    </div>
+  `;
 }
 
 function renderAppSettings() {

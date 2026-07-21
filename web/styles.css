@@ -306,6 +306,7 @@ select option {
 
 .stat strong {
   font-size: 16px;
+  overflow-wrap: anywhere;
 }
 
 .actions {
@@ -329,6 +330,14 @@ select option {
   color: var(--muted);
   font-size: 13px;
   font-weight: 700;
+}
+
+.field-label {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
 }
 
 .field input,
@@ -377,6 +386,10 @@ select option {
 .feature-btn span {
   color: var(--muted);
   margin-top: 4px;
+}
+
+.help-card p {
+  line-height: 1.7;
 }
 
 .switch-row,
@@ -645,6 +658,29 @@ select option {
 
 .carousel-slider {
   padding: 2px 0 13px;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.segmented button {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  border-radius: 8px;
+  font-weight: 800;
+}
+
+.segmented button.active,
+.segmented button:hover {
+  border-color: rgba(255, 240, 74, 0.85);
+  background: rgba(255, 240, 74, 0.16);
+  color: #fff7a8;
 }
 
 .hidden {
