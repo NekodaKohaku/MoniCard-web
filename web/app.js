@@ -32,7 +32,11 @@ const CONTROL_COMMAND = {
   SET_CAROUSEL: 42,
   RESP_CAROUSEL: 43,
   READ_CAROUSEL: 44,
-  RESP_CAROUSEL_RD: 45
+  RESP_CAROUSEL_RD: 45,
+  GET_PRODUCT: 0x46,
+  RESP_PRODUCT: 0x47,
+  DEVICE_LANGUAGE: 0x5a,
+  RESP_DEVICE_LANGUAGE: 0x5b
 };
 const FILE_COMMAND = {
   START_REQUEST: 0,
@@ -64,7 +68,11 @@ const CARD_INFO_MAX_BYTES = 319;
 const TAGS_MAX_COUNT = 5;
 const CONTROL_INFO_BYTES = 8;
 const FILE_TRANSFER_FREE_MARGIN_BYTES = 50 * 1024;
-const RESERVED_STORAGE_BYTES = 3 * 1024 * 1024;
+const RESERVED_STORAGE_BYTES = 2404352;
+const FIRMWARE_CATALOG_URL = "https://api.monicardserv.com/app-config/v1/firmware/manifest.json";
+const FIRMWARE_PRODUCTS = ["gen1", "max", "pro"];
+let firmwareCatalog = null;
+let firmwareMetadataBusy = false;
 const MOTION_MAX_DURATION_MS = 10000;
 const MOTION_MAX_FRAME_RATE = 20;
 const CAROUSEL_PRESETS = [3, 10, 30, 60];
@@ -419,7 +427,7 @@ const i18n = {
     copyFirmwareQueryData: "Copy firmware query data",
     firmwareQueryDataCopied: "Firmware query data copied",
     firmwareQueryDataCopyFailed: "Copy failed. Check that clipboard permission is allowed.",
-    cardContent: "Business card info",
+    cardContent: "Card details",
     maxBytes: "Up to {count} bytes",
     readFromDevice: "Read from device",
     uploadCard: "Upload card",
@@ -523,9 +531,9 @@ const i18n = {
     buzzerDesc: "Control sound alerts",
     vibration: "Vibration",
     vibrationDesc: "Control vibration feedback",
-    light: "Light Cues",
+    light: "Match light",
     lightDesc: "Control LED light alerts",
-    interest: "Interest Radar",
+    interest: "Interest matching",
     interestDesc: "Detect devices with shared interests",
     ambience: "Back ambient light",
     ambienceDesc: "Run the rear breathing light effect",
@@ -581,7 +589,7 @@ const i18n = {
     helpMediaTitle: "Asset upload",
     helpMediaBody: "Supports JPG, PNG, WebP, GIF, and common video formats. Images are cropped to 240×320 PNG. Videos and GIFs are converted to silent 240×320 MJPEG MP4 at 20 fps, up to 10 seconds. After upload, the device plays assets locally; the web app cannot read the current playback, list stored assets, or delete uploaded assets.",
     helpControlsTitle: "Device controls",
-    helpControlsBody: "Interest radar, buzzer, vibration, light cues, and rear ambient light are controlled from Device Settings. Turning off Interest Radar stops this device from receiving nearby match alerts, but it still broadcasts your card and tags.",
+    helpControlsBody: "Interest matching, the buzzer, vibration, match light, and rear ambient light can be adjusted in Device Settings. Turning off interest matching stops nearby match alerts; your card and tags are still broadcast unless broadcasting is also turned off.",
     helpCarouselTitle: "Carousel",
     helpCarouselBody: "The official app uses four intervals: 3, 10, 30, and 60 seconds. When carousel is off, the device stays on the current asset. If an uploaded asset does not appear, try changing the carousel setting or switching assets on the device.",
     helpFirmwareTitle: "Firmware update",
@@ -803,8 +811,8 @@ const i18n = {
     vibrationDesc: "近くにマッチする相手がいると振動で通知",
     light: "ライト通知",
     lightDesc: "マッチ時にカラーライトで通知",
-    interest: "動的感知",
-    interestDesc: "近くの対応端末を検知",
+    interest: "同じ趣味の相手を検知",
+    interestDesc: "共通のタグを持つ端末を検知して通知します。",
     ambience: "背面ライト",
     ambienceDesc: "背面ライトを点灯",
     broadcast: "名刺・タグ発信",
@@ -859,7 +867,7 @@ const i18n = {
     helpMediaTitle: "素材アップロード",
     helpMediaBody: "JPG、PNG、WebP、GIF、主要な動画形式に対応しています。画像は 240×320 PNG、動画とGIFは最大10秒・20fps・音声なしの 240×320 MJPEG MP4 に変換されます。アップロード後は端末本体で再生され、Web版では現在の再生内容、保存済み素材一覧、素材削除はできません。",
     helpControlsTitle: "端末設定",
-    helpControlsBody: "動的感知、ブザー、振動、ライト通知、背面ライトは端末設定から変更できます。動的感知をオフにすると近くのマッチ通知は受け取りませんが、名刺とタグの発信は継続されます。",
+    helpControlsBody: "同じ趣味の相手の検知、ブザー、振動、マッチ通知ライト、背面ライトは端末設定から変更できます。検知をオフにすると近くの相手とのマッチ通知は届かなくなります。名刺とタグの発信を止めるには、発信設定もオフにしてください。",
     helpCarouselTitle: "カルーセル",
     helpCarouselBody: "公式アプリと同じく、3、10、30、60秒の4段階です。カルーセルをオフにすると現在の素材に留まります。アップロード成功後に表示されない場合は、カルーセル設定や端末側の素材切替を試してください。",
     helpFirmwareTitle: "ファームウェア更新",
@@ -943,6 +951,179 @@ function writeStoredValue(key, value) {
   } catch {
     // Storage can be blocked by browser settings; keep the app usable in memory.
   }
+}
+
+const firmwareMessages = {
+  "zh-Hant": {
+    firmwareOfficialFlow: "可查詢官方韌體資訊，或匯入由韌體工具取得的資訊檔，再選擇本機更新檔。",
+    firmwareProduct: "設備系列",
+    firmwareChooseProduct: "請選擇實際設備系列",
+    firmwareProductGen1: "MoniCard 一代",
+    firmwareCheck: "查詢官方更新",
+    firmwareImportMetadata: "匯入韌體資訊",
+    firmwareCatalogLoading: "正在查詢官方韌體資訊…",
+    firmwareCatalogUnavailable: "目前無法從此頁面查詢。請先用 Python 韌體工具取得 catalog.json，再匯入韌體資訊。",
+    firmwareCatalogInvalid: "韌體資訊檔格式不正確。",
+    firmwareCatalogReady: "已載入韌體資訊。請選擇設備系列。",
+    firmwareNoRelease: "此系列沒有可用的韌體資訊。",
+    firmwareRelease: "目錄版本：{version} · 檔案：{name} · 大小：{size}",
+    firmwareMetadataIncomplete: "此版本缺少大小或 SHA-256 資訊，無法核驗更新檔。",
+    firmwareTargetVersion: "預期更新版本（選填）",
+    firmwareTargetHelp: "有韌體資訊時會自動填入；沒有時請依官方說明填寫，不要從檔名猜測。",
+    firmwareInvalidPackage: "這不是有效的設備 OTA 更新包，或更新包已損壞。",
+    firmwarePackageVersion: "不支援此 OTA 更新包格式版本。",
+    firmwareSizeMismatch: "更新檔大小與韌體資訊不符。",
+    firmwareHashMismatch: "更新檔 SHA-256 與韌體資訊不符，已停止更新。",
+    firmwareProductMismatch: "韌體資訊與選擇的設備系列、型號或硬體版本不符。",
+    firmwareCheckingFile: "正在檢查更新包與 SHA-256…",
+    firmwareFileVerified: "更新包結構與內部 CRC 正確；大小及 SHA-256 與載入資訊一致。目標版本：{version}",
+    firmwareStructureVerified: "更新包結構與內部 CRC 正確；未核對官方 SHA-256 或設備系列。",
+    firmwareVersionMismatch: "更新驗證失敗：預期 {expected}，設備回報 {actual}。",
+    firmwareVersionVerified: "更新完成，設備版本已確認為 {version}。",
+    firmwareVersionReadOnly: "設備已重新連線，版本：{version}。未提供目標版本，無法確認版本是否符合預期。",
+    firmwareDeviceChanged: "請先連線到要更新的設備。",
+    firmwareInvalidTarget: "請輸入有效版本號，例如 v2.2.0。",
+    firmwareUpdateFailed: "韌體更新失敗"
+  },
+  en: {
+    firmwareOfficialFlow: "Check the official firmware catalog, or import a catalog from the firmware tool, then choose a local update file.",
+    firmwareProduct: "Device series",
+    firmwareChooseProduct: "Select your device series",
+    firmwareProductGen1: "MoniCard (1st generation)",
+    firmwareCheck: "Check for updates",
+    firmwareImportMetadata: "Import firmware catalog",
+    firmwareCatalogLoading: "Checking the official firmware catalog…",
+    firmwareCatalogUnavailable: "The catalog cannot be accessed from this page. Use the Python firmware tool to save catalog.json, then import it here.",
+    firmwareCatalogInvalid: "Invalid firmware catalog.",
+    firmwareCatalogReady: "Firmware catalog loaded. Select your device series.",
+    firmwareNoRelease: "No firmware information is available for this series.",
+    firmwareRelease: "Catalog version: {version} · File: {name} · Size: {size}",
+    firmwareMetadataIncomplete: "This release has no size or SHA-256 information, so its update file cannot be verified.",
+    firmwareTargetVersion: "Expected version (optional)",
+    firmwareTargetHelp: "Filled in from the catalog when available. Otherwise, use the official release information rather than guessing from the filename.",
+    firmwareInvalidPackage: "This is not a valid device OTA package, or the package is damaged.",
+    firmwarePackageVersion: "This OTA package format version is not supported.",
+    firmwareSizeMismatch: "The update file size does not match the firmware information.",
+    firmwareHashMismatch: "The update file SHA-256 does not match the firmware information. Update stopped.",
+    firmwareProductMismatch: "The firmware information does not match the selected device series, model, or hardware revision.",
+    firmwareCheckingFile: "Checking the OTA package and SHA-256…",
+    firmwareFileVerified: "Package structure and internal CRC passed; size and SHA-256 match the loaded catalog. Target version: {version}",
+    firmwareStructureVerified: "Package structure and internal CRC passed. Official SHA-256 and device series have not been verified.",
+    firmwareVersionMismatch: "Update verification failed: expected {expected}, but the device reports {actual}.",
+    firmwareVersionVerified: "Update complete. Device version confirmed: {version}.",
+    firmwareVersionReadOnly: "Device reconnected. Version: {version}. No target version was provided, so the update version could not be confirmed.",
+    firmwareDeviceChanged: "Connect to the device you want to update first.",
+    firmwareInvalidTarget: "Enter a valid version, such as v2.2.0.",
+    firmwareUpdateFailed: "Firmware update failed"
+  },
+  ja: {
+    firmwareOfficialFlow: "公式のファームウェア情報を確認するか、ファームウェアツールで取得した情報ファイルを読み込んでから、更新ファイルを選択してください。",
+    firmwareProduct: "デバイスシリーズ",
+    firmwareChooseProduct: "お使いのデバイスシリーズを選択",
+    firmwareProductGen1: "MoniCard（初代）",
+    firmwareCheck: "更新を確認",
+    firmwareImportMetadata: "ファームウェア情報を読み込む",
+    firmwareCatalogLoading: "公式のファームウェア情報を確認しています…",
+    firmwareCatalogUnavailable: "このページから情報を取得できません。Pythonのファームウェアツールで catalog.json を保存し、読み込んでください。",
+    firmwareCatalogInvalid: "ファームウェア情報の形式が正しくありません。",
+    firmwareCatalogReady: "ファームウェア情報を読み込みました。デバイスシリーズを選択してください。",
+    firmwareNoRelease: "このシリーズのファームウェア情報はありません。",
+    firmwareRelease: "掲載バージョン：{version} · ファイル：{name} · サイズ：{size}",
+    firmwareMetadataIncomplete: "このバージョンにはサイズまたはSHA-256の情報がなく、更新ファイルを照合できません。",
+    firmwareTargetVersion: "更新先のバージョン（任意）",
+    firmwareTargetHelp: "情報ファイルがある場合は自動入力されます。ない場合は公式の案内に従って入力してください。ファイル名から推測しないでください。",
+    firmwareInvalidPackage: "有効なOTA更新パッケージではないか、ファイルが破損しています。",
+    firmwarePackageVersion: "このOTAパッケージの形式バージョンには対応していません。",
+    firmwareSizeMismatch: "更新ファイルのサイズがファームウェア情報と一致しません。",
+    firmwareHashMismatch: "更新ファイルのSHA-256がファームウェア情報と一致しないため、更新を中止しました。",
+    firmwareProductMismatch: "ファームウェア情報が選択したシリーズ、モデル、またはハードウェアのバージョンと一致しません。",
+    firmwareCheckingFile: "更新パッケージとSHA-256を確認しています…",
+    firmwareFileVerified: "パッケージの構造と内部CRCを確認しました。サイズとSHA-256も読み込んだ情報と一致しています。更新先：{version}",
+    firmwareStructureVerified: "パッケージの構造と内部CRCを確認しました。公式のSHA-256とデバイスシリーズは照合していません。",
+    firmwareVersionMismatch: "更新後の確認に失敗しました。予定：{expected}、デバイスのバージョン：{actual}。",
+    firmwareVersionVerified: "更新が完了しました。デバイスのバージョンを確認しました：{version}。",
+    firmwareVersionReadOnly: "再接続しました。バージョン：{version}。更新先が指定されていないため、予定どおりのバージョンかは確認できません。",
+    firmwareDeviceChanged: "更新するデバイスに接続してください。",
+    firmwareInvalidTarget: "有効なバージョンを入力してください（例：v2.2.0）。",
+    firmwareUpdateFailed: "ファームウェアの更新に失敗しました"
+  }
+};
+for (const [locale, messages] of Object.entries(firmwareMessages)) Object.assign(i18n[locale], messages);
+
+const deviceUpdateMessages = {
+  "zh-Hant": {
+    deviceLanguage: "設備介面語言", languageRead: "讀取語言設定", languageUnknown: "尚未讀取",
+    languageChinese: "簡體中文", languageEnglish: "英文", languageJapanese: "日文",
+    languageUnavailable: "無法讀取設備語言設定；目前韌體可能不支援，其他功能仍可使用。",
+    languageInvalid: "設備語言回應格式異常。", languageParameter: "語言參數錯誤。",
+    languageBusy: "設備忙碌中，請稍後再試。", languageUnsupported: "設備不支援此語言。",
+    languageSaveFailed: "設備無法儲存或套用語言。", languageSaved: "已套用設備介面語言。",
+    languageChangedDevice: "連線設備已變更，請重新讀取語言設定。",
+    productUnknown: "尚未確認，請核對設備系列", productDetected: "已辨識：{product}",
+    productConflict: "辨識結果與所選系列不同，請先重新確認。", productGen1: "MoniCard 標準版",
+    contactType: "聯絡方式", contactValue: "帳號、電話或連結", contactInsert: "加入名片",
+    contactEmail: "電子郵件", contactWebsite: "個人網站／連結", contactRequired: "請先填寫聯絡資料。",
+    cardTooLong: "名片內容過長，請縮短簡介、連結或標籤。", serialNumber: "設備序號",
+    broadcast: "名片與標籤廣播", serialUnavailable: "無法讀取設備序號，請重新連線後再試。"
+  },
+  en: {
+    deviceLanguage: "Device display language", languageRead: "Read language settings", languageUnknown: "Not read yet",
+    languageChinese: "Simplified Chinese", languageEnglish: "English", languageJapanese: "Japanese",
+    languageUnavailable: "Unable to read device language settings. Your firmware may not support this feature; other controls are still available.",
+    languageInvalid: "Invalid device language response.", languageParameter: "Invalid language parameter.",
+    languageBusy: "Device busy. Try again later.", languageUnsupported: "This language is not supported by the device.",
+    languageSaveFailed: "The device could not save or apply the language.", languageSaved: "Device display language updated.",
+    languageChangedDevice: "The connected device has changed. Read its language settings again.",
+    productUnknown: "Unconfirmed. Check your device series.", productDetected: "Detected: {product}",
+    productConflict: "The detected series differs from your selection. Check the device series before continuing.", productGen1: "MoniCard Standard",
+    contactType: "Contact method", contactValue: "Username, phone number, or link", contactInsert: "Add to card",
+    contactEmail: "Email", contactWebsite: "Website / profile link", contactRequired: "Enter your contact details first.",
+    cardTooLong: "Card content is too long. Shorten your bio, links, or tags.",
+    interest: "Interest matching", light: "Match light", ambience: "Rear ambient light", broadcast: "Card and tag broadcast",
+    serialUnavailable: "Unable to read the device serial number. Reconnect and try again."
+  },
+  ja: {
+    deviceLanguage: "端末の表示言語", languageRead: "言語設定を読み込む", languageUnknown: "未取得",
+    languageChinese: "簡体字中国語", languageEnglish: "英語", languageJapanese: "日本語",
+    languageUnavailable: "端末の言語設定を取得できませんでした。お使いのファームウェアでは未対応の可能性があります。他の設定は引き続き利用できます。",
+    languageInvalid: "端末の言語設定の応答が不正です。", languageParameter: "言語の指定が正しくありません。",
+    languageBusy: "端末が処理中です。しばらくしてからお試しください。", languageUnsupported: "この言語には対応していません。",
+    languageSaveFailed: "言語の保存または適用に失敗しました。", languageSaved: "端末の表示言語を変更しました。",
+    languageChangedDevice: "接続先が変わりました。言語設定をもう一度読み込んでください。",
+    productUnknown: "未確認。端末のシリーズを確認してください。", productDetected: "検出結果：{product}",
+    productConflict: "検出結果と選択したシリーズが異なります。更新前に確認してください。", productGen1: "MoniCard 標準モデル",
+    contactType: "連絡先の種類", contactValue: "ユーザー名・電話番号・リンク", contactInsert: "名刺に追加",
+    contactEmail: "メール", contactWebsite: "Webサイト・プロフィール", contactRequired: "連絡先を入力してください。",
+    cardTooLong: "名刺の内容が長すぎます。自己紹介、リンク、タグを短くしてください。",
+    interest: "同じ趣味の相手を検知", interestDesc: "共通のタグを持つ端末を検知して通知します。",
+    light: "マッチ通知ライト", broadcast: "名刺・タグの発信", serialUnavailable: "端末のシリアル番号を取得できませんでした。接続し直してお試しください。"
+  }
+};
+for (const [locale, messages] of Object.entries(deviceUpdateMessages)) Object.assign(i18n[locale], messages);
+const CONTACT_TYPES = ["QQ", "WeChat", "LINE", "Instagram", "TikTok", "KakaoTalk", "Discord", "Telegram", "WhatsApp", "email", "website"];
+
+function productFromSerial(sn) {
+  const serial = String(sn || "").trim().toUpperCase();
+  return /^[A-Z0-9]{12}$/.test(serial) ? ({ "1A1": "gen1", "1A2": "max", "1A3": "pro" }[serial.slice(0, 3)] || "") : "";
+}
+
+function productFromResponse(bytes) {
+  return ({ standard: "gen1", mc001: "gen1", max: "max", mc002: "max", pro: "pro", mc003: "pro" })[textFromBytes(bytes).toLowerCase()] || "";
+}
+
+function productLabel(product) {
+  return product === "gen1" ? t("productGen1") : product === "max" ? "MoniCard Max" : product === "pro" ? "MoniCard Pro" : t("productUnknown");
+}
+
+function parseDeviceLanguage(data) {
+  if (!data || data.length !== 3 || data[0] > 4 || data[1] > 2 || !(data[2] & (1 << data[1]))) {
+    throw new Error(t("languageInvalid"));
+  }
+  return { status: data[0], current: data[1], supported: data[2] };
+}
+
+function contactLabel(type) {
+  return type === "email" ? t("contactEmail") : type === "website" ? t("contactWebsite") : type;
 }
 
 function detectLocale() {
@@ -1435,6 +1616,7 @@ let lastRenderedRoute = "";
 let receivedCardsSyncing = false;
 let detailAutoRefreshing = false;
 let routeAutoRefreshTimer = null;
+let settingsIoBusy = false;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -1504,6 +1686,8 @@ function formatError(error, fallback = t("saveFailed")) {
 }
 
 function localizeKnownErrorMessage(message) {
+  if (Object.values(deviceUpdateMessages[currentLocale()]).some((template) => message === template)) return message;
+  if (Object.values(firmwareMessages[currentLocale()]).some((template) => message.startsWith(template.split("{")[0]))) return message;
   if (/請先連接設備|请先连接设备|藍牙未連接|蓝牙未连接|no connection|not connected/i.test(message)) return t("errorNoConnection");
   if (/只接受|太小|太大|不像|official \.bin|too small|too large|does not look|小さすぎ|大きすぎ|公式.*\.bin|見えません/i.test(message)) return message;
   if (/Firmware|firmware|韌體|ファームウェア|Device returned error|update|OTA|damaged|incompatible|does not match|empty|official \.bin|\.bin|too small|too large/i.test(message)) return t("errorFirmwareFile");
@@ -1519,6 +1703,7 @@ function getCurrentDevice() {
 
 function isDeviceLive(device) {
   if (!device || !ble.device || !ble.device.gatt || !ble.device.gatt.connected) return false;
+  if (device.bleDeviceId) return device.bleDeviceId === ble.device.id;
   if (ble.connection?.bleDeviceId && device.bleDeviceId && ble.connection.bleDeviceId === device.bleDeviceId) return true;
   if (state.currentDeviceId && (device.id === state.currentDeviceId || device.sn === state.currentDeviceId)) return true;
   return false;
@@ -1540,6 +1725,9 @@ function upsertDevice(device) {
     firmwareVersion: device.firmwareVersion || "--",
     latestFirmwareVersion: device.latestFirmwareVersion || "--",
     model: device.model || device.deviceModel || "MoniCard",
+    detectedFirmwareProduct: device.detectedFirmwareProduct || productFromSerial(device.sn),
+    firmwareProduct: device.firmwareProduct || state.devices.find((item) =>
+      (device.id && item.id === device.id) || (device.sn && item.sn === device.sn))?.firmwareProduct || device.detectedFirmwareProduct || productFromSerial(device.sn),
     deviceModel: device.deviceModel || device.model || "MoniCard",
     hardwareVersion: device.hardwareVersion || device.hardware || device.hwVersion || "default",
     hardware: device.hardware || device.hardwareVersion || device.hwVersion || "default",
@@ -1564,6 +1752,7 @@ function updateDevice(id, patch) {
 
 function firmwareQueryData(device) {
   return {
+    product: device?.firmwareProduct || productFromSerial(device?.sn) || device?.detectedFirmwareProduct || "",
     model: device?.model || device?.deviceModel || "MoniCard",
     hardware: device?.hardwareVersion || device?.hardware || device?.hwVersion || "default",
     currentVersion: device?.firmwareVersion && device.firmwareVersion !== "--" ? device.firmwareVersion : "",
@@ -1808,14 +1997,115 @@ function looksLikeWrongFirmwareFile(bytes) {
     ascii.includes("ftyp");
 }
 
-async function validateFirmwareFile(file) {
+function normalizeFirmwareVersion(version) {
+  const value = String(version || "").trim().replace(/^v/i, "").toLowerCase();
+  return /^\d+(?:\.\d+){1,3}$/.test(value) ? value : "";
+}
+
+function parseFirmwareCatalog(data) {
+  if (data?.schemaVersion !== 1 || !Array.isArray(data.releases) || !data.releases.length || data.releases.length > 256) {
+    throw new Error(t("firmwareCatalogInvalid"));
+  }
+  const releases = data.releases.map((release) => {
+    if (!release || !FIRMWARE_PRODUCTS.includes(release.product) || typeof release.model !== "string" ||
+        !release.model.trim() || typeof release.hardware !== "string" || !release.hardware.trim() ||
+        !normalizeFirmwareVersion(release.version)) throw new Error(t("firmwareCatalogInvalid"));
+    const size = release.size ?? 0;
+    const sha256 = String(release.sha256 || "").trim().toLowerCase();
+    if (!Number.isSafeInteger(size) || size < 0 || (sha256 && !/^[a-f0-9]{64}$/.test(sha256))) {
+      throw new Error(t("firmwareCatalogInvalid"));
+    }
+    return { ...release, size, sha256, version: normalizeFirmwareVersion(release.version) };
+  });
+  return { schemaVersion: 1, releases };
+}
+
+function matchingFirmwareRelease(catalog, device, product) {
+  if (!catalog || !device || !FIRMWARE_PRODUCTS.includes(product)) return null;
+  const query = firmwareQueryData(device);
+  return catalog.releases.filter((release) => release.product === product && release.model === query.model &&
+    release.hardware === query.hardware).sort((a, b) => {
+    const left = a.version.split(".").map(Number);
+    const right = b.version.split(".").map(Number);
+    for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+      const diff = (right[index] || 0) - (left[index] || 0);
+      if (diff) return diff;
+    }
+    return 0;
+  })[0] || null;
+}
+
+async function fetchFirmwareCatalog() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+  const readJson = async (url) => {
+    const response = await fetch(url, { signal: controller.signal, credentials: "omit", cache: "no-store" });
+    if (!response.ok) throw new Error(t("firmwareCatalogUnavailable"));
+    const text = await response.text();
+    if (text.length > 1024 * 1024) throw new Error(t("firmwareCatalogInvalid"));
+    return JSON.parse(text);
+  };
+  try {
+    const manifest = await readJson(FIRMWARE_CATALOG_URL);
+    if (manifest.schemaVersion !== 1 || typeof manifest.path !== "string" ||
+        !/^\/app-config\/v1\/firmware\/releases\/[a-f0-9]{64}\.json$/.test(manifest.path)) {
+      throw new Error(t("firmwareCatalogInvalid"));
+    }
+    return parseFirmwareCatalog(await readJson(new URL(manifest.path, FIRMWARE_CATALOG_URL).href));
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function validateOfflineFirmwarePackage(bytes) {
+  // SiFli FCES container: 12-byte header, 6-byte image entries, then image data.
+  if (bytes.length < 12 || readUint32(bytes, 0) !== 0x53454346) throw new Error(t("firmwareInvalidPackage"));
+  if (bytes[4] !== 1) throw new Error(t("firmwarePackageVersion"));
+  const imageCount = readUint16(bytes, 6);
+  const contentOffset = 12 + imageCount * 6;
+  if (!imageCount || imageCount > 64 || contentOffset > bytes.length) throw new Error(t("firmwareInvalidPackage"));
+  let offset = contentOffset;
+  const images = [];
+  const ids = new Set();
+  for (let index = 0; index < imageCount; index += 1) {
+    const entry = 12 + index * 6;
+    const id = bytes[entry];
+    const size = readUint32(bytes, entry + 2);
+    if (!size || offset + size > bytes.length || ids.has(id)) throw new Error(t("firmwareInvalidPackage"));
+    ids.add(id);
+    images.push({ id, size, offset });
+    offset += size;
+  }
+  if (offset !== bytes.length || crc32Mpeg2(bytes.subarray(contentOffset)) !== readUint32(bytes, 8)) {
+    throw new Error(t("firmwareInvalidPackage"));
+  }
+  return { images, packageCrc: readUint32(bytes, 8) };
+}
+
+async function validateFirmwareFile(file, release = null, device = null, product = "") {
+  const detected = productFromSerial(device?.sn) || device?.detectedFirmwareProduct || "";
+  if (detected && product && detected !== product) throw new Error(t("productConflict"));
   const name = String(file?.name || "");
   if (!/\.bin$/i.test(name)) throw new Error(t("firmwareOnlyBin"));
   if (!file || file.size <= 0) throw new Error("Firmware file is empty");
   if (file.size < FIRMWARE_MIN_BYTES) throw new Error(t("firmwareTooSmall"));
   if (file.size > FIRMWARE_MAX_BYTES) throw new Error(t("firmwareTooLarge"));
-  const header = new Uint8Array(await file.slice(0, 32).arrayBuffer());
-  if (looksLikeWrongFirmwareFile(header)) throw new Error(t("firmwareLooksWrong"));
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (looksLikeWrongFirmwareFile(bytes.subarray(0, 32))) throw new Error(t("firmwareLooksWrong"));
+  const packageInfo = validateOfflineFirmwarePackage(bytes);
+  let sha256 = "";
+  if (release) {
+    const query = firmwareQueryData(device);
+    if (!device || release.product !== product || release.model !== query.model || release.hardware !== query.hardware) {
+      throw new Error(t("firmwareProductMismatch"));
+    }
+    if (!release.size || !/^[a-f0-9]{64}$/.test(release.sha256 || "")) throw new Error(t("firmwareMetadataIncomplete"));
+    if (release.size !== bytes.length) throw new Error(t("firmwareSizeMismatch"));
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    sha256 = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    if (sha256 !== release.sha256) throw new Error(t("firmwareHashMismatch"));
+  }
+  return { bytes, packageInfo, sha256, targetVersion: release?.version || "" };
 }
 
 function encodeOta(command, payload = new Uint8Array()) {
@@ -2055,9 +2345,10 @@ class MoniCardWebBluetooth {
   async connectGranted(savedDevice = {}) {
     if (!navigator.bluetooth?.getDevices) throw new Error(t("refreshRequiresConnection"));
     const devices = await navigator.bluetooth.getDevices();
-    const target = devices.find((device) => {
-      return device.id === savedDevice.bleDeviceId || device.name === savedDevice.name || /monicard/i.test(device.name || "");
-    });
+    const candidates = savedDevice.bleDeviceId
+      ? devices.filter((device) => device.id === savedDevice.bleDeviceId)
+      : devices.filter((device) => savedDevice.name ? device.name === savedDevice.name : /monicard/i.test(device.name || ""));
+    const target = candidates.length === 1 ? candidates[0] : null;
     if (!target) throw new Error("沒有找到已授權的 MoniCard，請重新點擊連接設備");
     return this.connectDevice(target);
   }
@@ -2139,9 +2430,12 @@ class MoniCardWebBluetooth {
     const current = getCurrentDevice();
     if (current) updateDevice(current.id, { connected: false, statusLabel: t("deviceDisconnected") });
     this.connection = null;
-    this.pending.splice(0).forEach((item) => item.reject(new Error("藍牙連線已斷開")));
-      toast(t("deviceDisconnected"));
-    render();
+    this.pending.splice(0).forEach((item) => {
+      clearTimeout(item.timer);
+      item.reject(new Error("藍牙連線已斷開"));
+    });
+    if (!state.firmwareBusy) toast(t("deviceDisconnected"));
+    if (!state.firmwareBusy && !state.mediaBusy) render();
   }
 
   handleNotification(event) {
@@ -2198,6 +2492,12 @@ class MoniCardWebBluetooth {
   async readSummary(device = {}) {
     await this.ensureConnected();
     const sn = textFromBytes((await this.control(encodeGetSerialNumber(), CONTROL_COMMAND.GET_SERIAL_NUMBER + 1)).data);
+    if (!sn) throw new Error(t("serialUnavailable"));
+    let detectedFirmwareProduct = productFromSerial(sn);
+    if (!detectedFirmwareProduct) {
+      const productMessage = await this.control(encodeControl(CONTROL_COMMAND.GET_PRODUCT), CONTROL_COMMAND.RESP_PRODUCT).catch(() => null);
+      detectedFirmwareProduct = productMessage ? productFromResponse(productMessage.data) : "";
+    }
     const batteryMessage = await this.control(encodeGetBattery(), CONTROL_COMMAND.GET_BATTERY + 1).catch(() => null);
     const versionMessage = await this.control(encodeGetVersion(), CONTROL_COMMAND.GET_VERSION + 1).catch(() => null);
     const fsMessage = await this.control(encodeGetFileSystemInfo(), CONTROL_COMMAND.GET_FS_INFO_RESPONSE).catch(() => null);
@@ -2205,6 +2505,7 @@ class MoniCardWebBluetooth {
     const summary = {
       id: sn || device.id || this.device.id,
       sn: sn || "",
+      detectedFirmwareProduct,
       bleDeviceId: this.device.id,
       name: device.name || this.device.name || "MoniCard",
       connected: true,
@@ -2241,6 +2542,23 @@ class MoniCardWebBluetooth {
     const message = await this.control(encodeReadControlInfo(), CONTROL_COMMAND.CONTROL_INFO_RESPONSE, 5000);
     if (!message.data || message.data.length < CONTROL_INFO_BYTES) throw new Error("設備控制資訊回應異常");
     return settingsFromControlBytes(message.data.slice(0, CONTROL_INFO_BYTES));
+  }
+
+  async deviceLanguage(value = null) {
+    await this.ensureConnected();
+    if (value !== null && (!Number.isInteger(value) || value < 0 || value > 2)) throw new Error(t("languageParameter"));
+    const connection = this.connection;
+    if (value !== null && (!connection.languageInfo || !(connection.languageInfo.supported & (1 << value)))) {
+      throw new Error(t("languageUnsupported"));
+    }
+    const payload = value === null ? new Uint8Array([1]) : new Uint8Array([2, value]);
+    const message = await this.control(encodeControl(CONTROL_COMMAND.DEVICE_LANGUAGE, payload), CONTROL_COMMAND.RESP_DEVICE_LANGUAGE, 5000);
+    if (this.connection !== connection || !this.device?.gatt.connected) throw new Error(t("languageChangedDevice"));
+    const info = parseDeviceLanguage(message.data);
+    if (info.status !== 0) throw new Error(t(["", "languageParameter", "languageBusy", "languageUnsupported", "languageSaveFailed"][info.status]));
+    if (value !== null && info.current !== value) throw new Error(t("languageSaveFailed"));
+    connection.languageInfo = info;
+    return info;
   }
 
   async writeControlSettings(settings) {
@@ -2341,11 +2659,13 @@ class MoniCardWebBluetooth {
     return { fileName: safeName, type, byteLength: bytes.length, transferSize: prepared.totalLength, crc: prepared.crc };
   }
 
-  async transferFirmwarePackage(file, onProgress) {
+  async transferFirmwarePackage(file, onProgress, verification = {}) {
     await this.ensureConnected();
+    if (verification.device?.bleDeviceId && verification.device.bleDeviceId !== this.device.id) {
+      throw new Error(t("firmwareDeviceChanged"));
+    }
     activeTransferAbort = false;
-    await validateFirmwareFile(file);
-    const bytes = new Uint8Array(await file.arrayBuffer());
+    const { bytes } = await validateFirmwareFile(file, verification.release, verification.device, verification.product);
     if (!bytes.length) throw new Error("Firmware file is empty");
     const packetCount = Math.max(1, Math.ceil(bytes.length / OTA_PACKAGE_PACKET_BYTES));
     const packageCrc = crc32Mpeg2(bytes);
@@ -2357,7 +2677,10 @@ class MoniCardWebBluetooth {
     );
     const startInfo = parseOtaPackageStart(start);
     const responseFrequency = Math.max(1, Number(startInfo.responseFrequency) || 1);
-    const completedCount = Math.max(0, Math.min(Number(startInfo.completedCount) || 0, packetCount));
+    const completedCount = Number(startInfo.completedCount) || 0;
+    if (!Number.isInteger(completedCount) || completedCount < 0 || completedCount > packetCount) {
+      throw new Error(t("firmwareInvalidPackage"));
+    }
     for (let packetIndex = completedCount + 1; packetIndex <= packetCount; packetIndex += 1) {
       if (activeTransferAbort) throw new Error("傳輸已取消");
       const offset = OTA_PACKAGE_PACKET_BYTES * (packetIndex - 1);
@@ -2404,8 +2727,8 @@ function formatFsInfo(fs) {
   const used = Math.max(0, rawUsed - RESERVED_STORAGE_BYTES);
   const total = Math.max(0, fs.totalBytes - RESERVED_STORAGE_BYTES);
   return {
-    usedStorageLabel: formatBytes(used),
-    totalStorageLabel: formatBytes(total),
+    usedStorageLabel: used === 0 ? "0K" : formatBytes(used),
+    totalStorageLabel: total === 0 ? "0K" : formatBytes(total),
     storagePercent: total ? Math.max(0, Math.min(Math.round((used / total) * 100), 100)) : 0
   };
 }
@@ -3437,14 +3760,15 @@ function showRenderError(error) {
 }
 
 function renderNav() {
+  const busy = state.firmwareBusy || state.mediaBusy;
+  for (const selector of ["#connectBtn", "#disconnectBtn", "#languageSelect"]) $(selector).disabled = busy;
   $("#nav").innerHTML = routes.map(([key, label]) => {
-    const disabled = (state.firmwareBusy && key !== "firmware") || (state.mediaBusy && key !== "media");
+    const disabled = busy;
     return `<button class="${state.currentRoute === key ? "active" : ""}" data-route="${key}" type="button" ${disabled ? "disabled" : ""}>${t(label)}</button>`;
   }).join("");
   $("#nav").querySelectorAll("button").forEach((button) => {
     button.addEventListener("click", () => {
-      if (state.firmwareBusy && button.dataset.route !== "firmware") return;
-      if (state.mediaBusy && button.dataset.route !== "media") return;
+      if (state.firmwareBusy || state.mediaBusy) return;
       setState({ currentRoute: button.dataset.route });
     });
   });
@@ -3552,6 +3876,7 @@ function renderDetail(options = {}) {
           <div class="stat"><span>${t("serialNumber")}</span><strong>${escapeHtml(device.sn || "--")}</strong></div>
           <div class="stat"><span>${t("bluetoothId")}</span><strong>${escapeHtml(device.bleDeviceId || "--")}</strong></div>
           <div class="stat"><span>${t("deviceModel")}</span><strong>${escapeHtml(device.model || device.deviceModel || "MoniCard")}</strong></div>
+          <div class="stat"><span>${t("firmwareProduct")}</span><strong>${escapeHtml(productLabel(productFromSerial(device.sn) || device.detectedFirmwareProduct))}</strong></div>
           <div class="stat"><span>${t("hardwareVersion")}</span><strong>${escapeHtml(device.hardwareVersion || device.hardware || device.hwVersion || "default")}</strong></div>
           <div class="stat"><span>${t("battery")}</span><strong>${escapeHtml(String(device.battery ?? "--"))}%</strong></div>
           <div class="stat"><span>${t("firmwareVersion")}</span><strong>${escapeHtml(device.firmwareVersion || "--")}</strong></div>
@@ -3624,6 +3949,15 @@ function renderCard(options = {}) {
           <label>${t("maxBytes", { count: CARD_INFO_MAX_BYTES })}</label>
           <textarea id="cardText">${escapeHtml(text)}</textarea>
         </div>
+        <div class="field">
+          <label for="contactType">${t("contactType")}</label>
+          <select id="contactType">${CONTACT_TYPES.map((type) => `<option value="${type}">${escapeHtml(contactLabel(type))}</option>`).join("")}</select>
+        </div>
+        <div class="field">
+          <label for="contactValue">${t("contactValue")}</label>
+          <input id="contactValue" type="text" maxlength="319">
+        </div>
+        <div class="actions"><button id="insertContactBtn" class="secondary-btn" type="button">${t("contactInsert")}</button></div>
         <div class="muted" id="cardBytes">${bytesLen(text)} / ${CARD_INFO_MAX_BYTES} bytes</div>
         <div class="actions">
           <button id="readCardBtn" class="secondary-btn" type="button">${t("readFromDevice")}</button>
@@ -3639,6 +3973,19 @@ function renderCard(options = {}) {
     ${receivedCardsPanel()}
   `;
   const input = $("#cardText");
+  $("#contactType").addEventListener("change", (event) => {
+    const type = event.target.value;
+    $("#contactValue").type = type === "email" ? "email" : type === "website" ? "url" : type === "WhatsApp" ? "tel" : "text";
+  });
+  $("#insertContactBtn").addEventListener("click", () => {
+    const value = $("#contactValue").value.trim().replace(/[\r\n]+/g, " ");
+    if (!value) return toast(t("contactRequired"));
+    const next = `${input.value}${input.value && !input.value.endsWith("\n") ? "\n" : ""}${contactLabel($("#contactType").value)}: ${value}`;
+    if (bytesLen(next) > CARD_INFO_MAX_BYTES) return toast(t("cardTooLong"));
+    input.value = next;
+    input.dispatchEvent(new Event("input"));
+    $("#contactValue").value = "";
+  });
   input.addEventListener("input", () => {
     const value = input.value.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
     $("#cardBytes").textContent = `${bytesLen(value)} / ${CARD_INFO_MAX_BYTES} bytes`;
@@ -3658,7 +4005,7 @@ function renderCard(options = {}) {
   });
   $("#writeCardBtn").addEventListener("click", async () => {
     try {
-      if (bytesLen(input.value) > CARD_INFO_MAX_BYTES) throw new Error("名片内容过长");
+      if (bytesLen(input.value) > CARD_INFO_MAX_BYTES) throw new Error(t("cardTooLong"));
       await ble.writeCardInfo(input.value);
       if (device) updateDevice(device.id, { cardPreview: input.value, connected: true, statusLabel: t("settingsSynced") });
       toast(t("cardUploaded"));
@@ -4397,6 +4744,12 @@ function renderDeviceSettings() {
         <button id="readSettingsBtn" class="secondary-btn" type="button">${t("readSettings")}</button>
       </div>
       <p id="settingsStatus" class="muted">${ble.connection ? t("autoReadingSettings") : t("autoReadSkipped")}</p>
+      <div class="field">
+        <label for="deviceLanguageSelect">${t("deviceLanguage")}</label>
+        <select id="deviceLanguageSelect" disabled><option value="">${t("languageUnknown")}</option></select>
+        <p id="deviceLanguageStatus" class="muted" role="status"></p>
+        <div class="actions"><button id="readDeviceLanguageBtn" class="secondary-btn" type="button">${t("languageRead")}</button></div>
+      </div>
       <div id="switches">${controls.map(([key, title, desc]) => `
         <label class="switch-row">
           <span><strong>${title}</strong><br><span class="muted">${desc}</span></span>
@@ -4422,10 +4775,32 @@ function renderDeviceSettings() {
   $("#readSettingsBtn").addEventListener("click", async () => {
     await readSettingsAndCarousel({ notify: true });
   });
+  $("#readDeviceLanguageBtn").addEventListener("click", () => refreshDeviceLanguage());
+  $("#deviceLanguageSelect").addEventListener("change", async (event) => {
+    if (settingsIoBusy) return;
+    const previous = ble.connection?.languageInfo;
+    settingsIoBusy = true;
+    setSettingsControlsBusy(true);
+    try {
+      const info = await ble.deviceLanguage(Number(event.target.value));
+      updateDeviceLanguageControls(info);
+      toast(t("languageSaved"));
+    } catch (error) {
+      updateDeviceLanguageControls(previous);
+      const status = $("#deviceLanguageStatus");
+      if (status) status.textContent = error.message;
+      toast(formatError(error, t("syncFailed")));
+    } finally {
+      settingsIoBusy = false;
+      setSettingsControlsBusy(false);
+    }
+  });
   view.querySelectorAll("[data-setting]").forEach((input) => {
     input.addEventListener("change", async () => {
       const previousChecked = !input.checked;
-      input.disabled = true;
+      if (settingsIoBusy) { input.checked = previousChecked; return; }
+      settingsIoBusy = true;
+      setSettingsControlsBusy(true);
       const next = { ...state.deviceSettings, [input.dataset.setting]: !input.checked };
       try {
         const saved = await ble.writeControlSettings(next);
@@ -4437,7 +4812,8 @@ function renderDeviceSettings() {
         input.checked = previousChecked;
         toast(formatError(error, t("syncFailed")));
       } finally {
-        input.disabled = false;
+        settingsIoBusy = false;
+        setSettingsControlsBusy(false);
       }
     });
   });
@@ -4452,10 +4828,55 @@ function renderDeviceSettings() {
       await saveCarouselSeconds(Number(button.dataset.carouselPreset) || 10);
     });
   });
-  if (ble.connection) setTimeout(() => readSettingsAndCarousel({ notify: false }), 0);
+  updateDeviceLanguageControls(ble.connection?.languageInfo);
+  setSettingsControlsBusy(settingsIoBusy);
+  if (ble.connection) setTimeout(() => {
+    if (state.currentRoute === "settings") readSettingsAndCarousel({ notify: false });
+  }, 0);
+}
+
+function setSettingsControlsBusy(busy) {
+  for (const selector of ["#connectBtn", "#disconnectBtn"]) {
+    const button = $(selector);
+    if (button) button.disabled = busy || state.firmwareBusy || state.mediaBusy || firmwareMetadataBusy;
+  }
+  if (state.currentRoute !== "settings") return;
+  view.querySelectorAll("button, input, select").forEach((element) => { element.disabled = busy; });
+  const select = $("#deviceLanguageSelect");
+  if (select) select.disabled = busy || !ble.connection?.languageInfo;
+}
+
+function updateDeviceLanguageControls(info) {
+  const select = $("#deviceLanguageSelect");
+  if (!select) return;
+  const keys = ["languageChinese", "languageEnglish", "languageJapanese"];
+  select.innerHTML = info ? keys.map((key, value) => `<option value="${value}" ${value === info.current ? "selected" : ""} ${info.supported & (1 << value) ? "" : "disabled"}>${t(key)}</option>`).join("") : `<option value="">${t("languageUnknown")}</option>`;
+  select.disabled = settingsIoBusy || !info;
+}
+
+async function refreshDeviceLanguage(alreadyBusy = false) {
+  if (settingsIoBusy && !alreadyBusy) return;
+  if (!alreadyBusy) { settingsIoBusy = true; setSettingsControlsBusy(true); }
+  const connection = ble.connection;
+  try {
+    const info = await ble.deviceLanguage();
+    updateDeviceLanguageControls(info);
+    const status = $("#deviceLanguageStatus");
+    if (status) status.textContent = "";
+  } catch {
+    if (ble.connection === connection && connection) delete connection.languageInfo;
+    updateDeviceLanguageControls(null);
+    const status = $("#deviceLanguageStatus");
+    if (status) status.textContent = t("languageUnavailable");
+  } finally {
+    if (!alreadyBusy) { settingsIoBusy = false; setSettingsControlsBusy(false); }
+  }
 }
 
 async function readSettingsAndCarousel(options = {}) {
+  if (settingsIoBusy) return;
+  settingsIoBusy = true;
+  setSettingsControlsBusy(true);
   try {
     const status = $("#settingsStatus");
     if (status) status.textContent = t("autoReadingSettings");
@@ -4472,12 +4893,15 @@ async function readSettingsAndCarousel(options = {}) {
     if (options.notify) toast(formatError(error, t("readFailed")));
     const status = $("#settingsStatus");
     if (status) status.textContent = formatError(error, t("readFailed"));
+  } finally {
+    if (state.currentRoute === "settings" && ble.connection) await refreshDeviceLanguage(true);
+    settingsIoBusy = false;
+    setSettingsControlsBusy(false);
   }
 }
 
 function applyDeviceSettingsToSwitches(settings) {
   view.querySelectorAll("[data-setting]").forEach((input) => {
-    if (input.disabled) return;
     input.checked = !settings[input.dataset.setting];
   });
 }
@@ -4501,6 +4925,10 @@ function normalizeCarouselSeconds(seconds) {
 }
 
 async function saveCarouselSeconds(seconds, toggleElement) {
+  if (settingsIoBusy) return;
+  settingsIoBusy = true;
+  setSettingsControlsBusy(true);
+  const previous = getCurrentDevice()?.carouselDuration || 0;
   try {
     const normalized = normalizeCarouselSeconds(seconds);
     await ble.writeCarousel(normalized);
@@ -4509,8 +4937,11 @@ async function saveCarouselSeconds(seconds, toggleElement) {
     updateCarouselControls(normalized);
     toast(normalized > 0 ? t("carouselSaved") : t("carouselOff"));
   } catch (error) {
-    if (toggleElement) toggleElement.checked = !toggleElement.checked;
+    updateCarouselControls(previous);
     toast(formatError(error, t("saveFailed")));
+  } finally {
+    settingsIoBusy = false;
+    setSettingsControlsBusy(false);
   }
 }
 
@@ -4612,22 +5043,46 @@ function bindReceivedCards(options = {}) {
 }
 
 function renderFirmware() {
-  const deviceBeforeUpdate = getCurrentDevice();
+  const device = getCurrentDevice();
   const settings = ensureAppSettings();
   const advancedVisible = Boolean(settings.firmwareAdvancedVisible);
   const riskAccepted = Boolean(settings.firmwareRiskAccepted);
   const currentVersion = getCurrentDevice()?.firmwareVersion || "--";
+  const detected = productFromSerial(device?.sn) || device?.detectedFirmwareProduct || "";
+  if (device && detected && !device.firmwareProduct) updateDevice(device.id, { firmwareProduct: detected });
+  const product = device?.firmwareProduct || detected;
+  const release = matchingFirmwareRelease(firmwareCatalog, device, product);
+  const notes = release?.releaseNotesI18n?.[currentLocale()] || release?.releaseNotes || "";
   view.innerHTML = `
     <div class="panel form">
       <h2>${t("firmwareUpgrade")}</h2>
       <p class="muted">${t("firmwareHelp")}</p>
       <p class="muted">${t("firmwareOfficialFlow")}</p>
-      <p class="muted">${t("firmwareCurrentVersion", { version: currentVersion })}</p>
+      <p id="firmwareCurrentVersion" class="muted">${t("firmwareCurrentVersion", { version: currentVersion })}</p>
+      <div class="field">
+        <label for="firmwareProduct">${t("firmwareProduct")}</label>
+        <select id="firmwareProduct">
+          <option value="">${t("firmwareChooseProduct")}</option>
+          ${FIRMWARE_PRODUCTS.map((value) => `<option value="${value}" ${value === product ? "selected" : ""}>${productLabel(value)}</option>`).join("")}
+        </select>
+        <p class="muted">${escapeHtml(detected ? t("productDetected", { product: productLabel(detected) }) : t("productUnknown"))}${detected && product !== detected ? ` · ${escapeHtml(t("productConflict"))}` : ""}</p>
+      </div>
+      <div class="actions">
+        <button id="checkFirmwareBtn" class="secondary-btn" type="button">${t("firmwareCheck")}</button>
+        <button id="importFirmwareMetadataBtn" class="secondary-btn" type="button">${t("firmwareImportMetadata")}</button>
+      </div>
+      <p id="firmwareCatalogStatus" class="muted">${escapeHtml(release ? t("firmwareRelease", { version: release.version, name: release.fileName || "--", size: formatBytes(release.size) }) : firmwareCatalog ? t(product ? "firmwareNoRelease" : "firmwareCatalogReady") : "")}</p>
+      ${notes ? `<p class="muted" style="white-space:pre-line">${escapeHtml(notes)}</p>` : ""}
       <label class="switch-row">
         <span><strong>${t("firmwareAdvanced")}</strong><br><span class="muted">${t("firmwareAdvancedHelp")}</span></span>
         <input id="firmwareAdvancedToggle" class="switch" type="checkbox" ${advancedVisible ? "checked" : ""}>
       </label>
       <div id="firmwareAdvancedPanel" class="${advancedVisible ? "" : "hidden"}">
+        <div class="field">
+          <label for="firmwareTargetVersion">${t("firmwareTargetVersion")}</label>
+          <input id="firmwareTargetVersion" value="${escapeAttr(release?.version || "")}" placeholder="v2.2.0" ${release ? "readonly" : ""}>
+          <span class="muted">${t("firmwareTargetHelp")}</span>
+        </div>
         <label class="check-pill full"><input id="firmwareRiskAccepted" type="checkbox" ${riskAccepted ? "checked" : ""}>${t("firmwareConfirmOfficial")}</label>
         <div class="actions">
           <button id="pickFirmwareBtn" class="primary-btn" type="button" ${riskAccepted ? "" : "disabled"}>${t("pickFirmware")}</button>
@@ -4637,6 +5092,51 @@ function renderFirmware() {
       <pre id="firmwareLog" class="log">${t("waitingFirmware")}</pre>
     </div>
   `;
+  $("#firmwareProduct").addEventListener("change", (event) => {
+    if (!getCurrentDevice()) return toast(t("firmwareDeviceChanged"));
+    updateDevice(getCurrentDevice().id, { firmwareProduct: event.target.value });
+    renderFirmware();
+  });
+  $("#checkFirmwareBtn").addEventListener("click", async (event) => {
+    const status = $("#firmwareCatalogStatus");
+    firmwareMetadataBusy = true;
+    view.querySelectorAll("button, input, select").forEach((element) => { element.disabled = true; });
+    status.textContent = t("firmwareCatalogLoading");
+    let failed = false;
+    try {
+      firmwareCatalog = await fetchFirmwareCatalog();
+    } catch {
+      failed = true;
+    } finally {
+      firmwareMetadataBusy = false;
+      if (state.currentRoute === "firmware" && !state.firmwareBusy) {
+        renderFirmware();
+        if (failed) $("#firmwareCatalogStatus").textContent = t("firmwareCatalogUnavailable");
+      }
+    }
+  });
+  $("#importFirmwareMetadataBtn").addEventListener("click", () => {
+    filePicker.accept = ".json,application/json";
+    filePicker.removeAttribute("capture");
+    filePicker.value = "";
+    filePicker.onchange = async () => {
+      const file = filePicker.files[0];
+      if (!file) return;
+      firmwareMetadataBusy = true;
+      view.querySelectorAll("button, input, select").forEach((element) => { element.disabled = true; });
+      try {
+        if (file.size > 1024 * 1024) throw new Error(t("firmwareCatalogInvalid"));
+        firmwareCatalog = parseFirmwareCatalog(JSON.parse(await file.text()));
+      } catch {
+        toast(t("firmwareCatalogInvalid"));
+      } finally {
+        firmwareMetadataBusy = false;
+        if (state.currentRoute === "firmware" && !state.firmwareBusy) renderFirmware();
+        filePicker.value = "";
+      }
+    };
+    filePicker.click();
+  });
   $("#firmwareAdvancedToggle").addEventListener("change", (event) => {
     ensureAppSettings().firmwareAdvancedVisible = event.target.checked;
     saveState();
@@ -4649,64 +5149,97 @@ function renderFirmware() {
   });
   $("#pickFirmwareBtn").addEventListener("click", () => {
     if (!ensureAppSettings().firmwareRiskAccepted) return toast(t("firmwareRequireConfirm"));
+    if (!FIRMWARE_PRODUCTS.includes(getCurrentDevice()?.firmwareProduct)) return toast(t("firmwareChooseProduct"));
     filePicker.accept = ".bin";
     filePicker.removeAttribute("capture");
     filePicker.onchange = async () => {
       const file = filePicker.files[0];
       if (!file) return;
+      const deviceBeforeUpdate = getCurrentDevice();
+      const selectedProduct = deviceBeforeUpdate?.firmwareProduct;
+      const selectedRelease = matchingFirmwareRelease(firmwareCatalog, deviceBeforeUpdate, selectedProduct);
+      const targetInput = $("#firmwareTargetVersion").value.trim();
+      const targetVersion = selectedRelease?.version || normalizeFirmwareVersion(targetInput);
+      if (targetInput && !targetVersion) {
+        filePicker.value = "";
+        return toast(t("firmwareInvalidTarget"));
+      }
+      state = { ...state, firmwareBusy: true, currentRoute: "firmware" };
+      renderNav();
+      view.querySelectorAll("button, input, select").forEach((element) => { element.disabled = true; });
       try {
+        if (!deviceBeforeUpdate || !isDeviceLive(deviceBeforeUpdate)) throw new Error(t("firmwareDeviceChanged"));
+        if (firmwareCatalog && !selectedRelease) throw new Error(t("firmwareNoRelease"));
         $("#firmwareProgress").style.width = "0%";
-        await validateFirmwareFile(file);
-        $("#firmwareLog").textContent = t("firmwareReady", { name: file.name, size: formatBytes(file.size) });
+        $("#firmwareLog").textContent = t("firmwareCheckingFile");
+        await validateFirmwareFile(file, selectedRelease, deviceBeforeUpdate, selectedProduct);
+        $("#firmwareLog").textContent = `${t("firmwareReady", { name: file.name, size: formatBytes(file.size) })}\n${t(selectedRelease ? "firmwareFileVerified" : "firmwareStructureVerified", { version: targetVersion })}`;
         if (!confirm(t("confirmFirmwareUpdate"))) return;
-        state = { ...state, firmwareBusy: true, currentRoute: "firmware" };
         saveState();
-        renderNav();
         await ble.transferFirmwarePackage(file, ({ percent, message }) => {
           $("#firmwareProgress").style.width = `${percent}%`;
           $("#firmwareLog").textContent = message;
-        });
+        }, { release: selectedRelease, device: deviceBeforeUpdate, product: selectedProduct });
         $("#firmwareProgress").style.width = "100%";
         $("#firmwareLog").textContent = t("firmwareReconnectHint");
         toast(t("firmwareTransferred"));
-        await verifyFirmwareAfterUpdate(deviceBeforeUpdate);
+        await verifyFirmwareAfterUpdate(deviceBeforeUpdate, targetVersion);
       } catch (error) {
-        $("#firmwareLog").textContent = formatError(error, t("firmwareTransferFailed"));
-        toast(formatError(error, t("firmwareTransferFailed")));
+        $("#firmwareLog").textContent = formatError(error, t("firmwareUpdateFailed"));
+        toast(formatError(error, t("firmwareUpdateFailed")));
       } finally {
         state = { ...state, firmwareBusy: false };
         saveState();
         renderNav();
+        view.querySelectorAll("button, input, select").forEach((element) => { element.disabled = false; });
+        $("#firmwareTargetVersion").readOnly = Boolean(matchingFirmwareRelease(firmwareCatalog, getCurrentDevice(), getCurrentDevice()?.firmwareProduct));
+        $("#pickFirmwareBtn").disabled = !ensureAppSettings().firmwareRiskAccepted;
         filePicker.value = "";
       }
     };
     filePicker.click();
   });
+  if (firmwareMetadataBusy) {
+    view.querySelectorAll("button, input, select").forEach((element) => { element.disabled = true; });
+    $("#firmwareCatalogStatus").textContent = t("firmwareCatalogLoading");
+  }
 }
 
-async function verifyFirmwareAfterUpdate(deviceBeforeUpdate) {
+async function verifyFirmwareAfterUpdate(deviceBeforeUpdate, targetVersion = "") {
   await sleep(10000);
   const target = deviceBeforeUpdate || getCurrentDevice() || {};
   for (let attempt = 1; attempt <= 60; attempt += 1) {
     const log = $("#firmwareLog");
     if (log) log.textContent = t("firmwareVerifying", { count: attempt });
+    let summary;
     try {
       if (!ble.device || !ble.device.gatt.connected) await ble.connectGranted(target);
-      const summary = await ble.readSummary(target);
-      upsertDevice({ ...target, ...summary, connected: true, statusLabel: t("online") });
-      const version = summary.firmwareVersion || "--";
-      const nextLog = $("#firmwareLog");
-      if (nextLog) nextLog.textContent = t("firmwareVerified", { version });
-      toast(t("firmwareVerified", { version }));
-      return summary;
+      summary = await ble.readSummary(target);
+      if (!normalizeFirmwareVersion(summary.firmwareVersion)) throw new Error(t("firmwareVerifyFailed"));
     } catch (error) {
       await sleep(3000);
+      continue;
     }
+    if ((target.bleDeviceId && summary.bleDeviceId !== target.bleDeviceId) || (target.sn && summary.sn !== target.sn)) {
+      throw new Error(t("firmwareDeviceChanged"));
+    }
+    upsertDevice({ ...target, ...summary, connected: true, statusLabel: t("online") });
+    const version = summary.firmwareVersion;
+    const currentVersionLabel = $("#firmwareCurrentVersion");
+    if (currentVersionLabel) currentVersionLabel.textContent = t("firmwareCurrentVersion", { version });
+    if (targetVersion && normalizeFirmwareVersion(version) !== normalizeFirmwareVersion(targetVersion)) {
+      throw new Error(t("firmwareVersionMismatch", { expected: targetVersion, actual: version }));
+    }
+    const message = t(targetVersion ? "firmwareVersionVerified" : "firmwareVersionReadOnly", { version });
+    const nextLog = $("#firmwareLog");
+    if (nextLog) nextLog.textContent = message;
+    toast(message);
+    return summary;
   }
   const log = $("#firmwareLog");
   if (log) log.textContent = t("firmwareVerifyFailed");
   toast(t("firmwareVerifyFailed"));
-  return null;
+  throw new Error(t("firmwareVerifyFailed"));
 }
 
 function renderHelp() {
