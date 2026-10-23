@@ -1053,7 +1053,7 @@ for (const [locale, messages] of Object.entries(firmwareMessages)) Object.assign
 const deviceUpdateMessages = {
   "zh-Hant": {
     deviceLanguage: "設備介面語言", languageRead: "讀取語言設定", languageUnknown: "尚未讀取",
-    languageChinese: "簡體中文", languageEnglish: "英文", languageJapanese: "日文",
+    languageChinese: "简体中文", languageEnglish: "English", languageJapanese: "日本語",
     languageUnavailable: "無法讀取設備語言設定；目前韌體可能不支援，其他功能仍可使用。",
     languageInvalid: "設備語言回應格式異常。", languageParameter: "語言參數錯誤。",
     languageBusy: "設備忙碌中，請稍後再試。", languageUnsupported: "設備不支援此語言。",
@@ -1068,7 +1068,7 @@ const deviceUpdateMessages = {
   },
   en: {
     deviceLanguage: "Device display language", languageRead: "Read language settings", languageUnknown: "Not read yet",
-    languageChinese: "Simplified Chinese", languageEnglish: "English", languageJapanese: "Japanese",
+    languageChinese: "简体中文", languageEnglish: "English", languageJapanese: "日本語",
     languageUnavailable: "Unable to read device language settings. Your firmware may not support this feature; other controls are still available.",
     languageInvalid: "Invalid device language response.", languageParameter: "Invalid language parameter.",
     languageBusy: "Device busy. Try again later.", languageUnsupported: "This language is not supported by the device.",
@@ -1084,7 +1084,7 @@ const deviceUpdateMessages = {
   },
   ja: {
     deviceLanguage: "端末の表示言語", languageRead: "言語設定を読み込む", languageUnknown: "未取得",
-    languageChinese: "簡体字中国語", languageEnglish: "英語", languageJapanese: "日本語",
+    languageChinese: "简体中文", languageEnglish: "English", languageJapanese: "日本語",
     languageUnavailable: "端末の言語設定を取得できませんでした。お使いのファームウェアでは未対応の可能性があります。他の設定は引き続き利用できます。",
     languageInvalid: "端末の言語設定の応答が不正です。", languageParameter: "言語の指定が正しくありません。",
     languageBusy: "端末が処理中です。しばらくしてからお試しください。", languageUnsupported: "この言語には対応していません。",
@@ -2502,6 +2502,7 @@ class MoniCardWebBluetooth {
     const versionMessage = await this.control(encodeGetVersion(), CONTROL_COMMAND.GET_VERSION + 1).catch(() => null);
     const fsMessage = await this.control(encodeGetFileSystemInfo(), CONTROL_COMMAND.GET_FS_INFO_RESPONSE).catch(() => null);
     const fs = parseFsInfo(fsMessage);
+    const firmwareVersion = versionMessage ? textFromBytes(versionMessage.data) || "--" : "--";
     const summary = {
       id: sn || device.id || this.device.id,
       sn: sn || "",
@@ -2511,8 +2512,8 @@ class MoniCardWebBluetooth {
       connected: true,
       statusLabel: t("online"),
       battery: batteryMessage && batteryMessage.data.length >= 2 ? readUint16(batteryMessage.data, 0) : "--",
-      firmwareVersion: versionMessage ? textFromBytes(versionMessage.data) || "--" : "--",
-      ...formatFsInfo(fs)
+      firmwareVersion,
+      ...formatFsInfo(fs, firmwareVersion)
     };
     this.connection = { ...this.connection, ...summary };
     return summary;
@@ -2721,11 +2722,20 @@ function formatBytes(bytes) {
   return `${Math.round(bytes / 1024)}K`;
 }
 
-function formatFsInfo(fs) {
+function storageReservedBytes(firmwareVersion) {
+  const match = /^[vV]?(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.exec(String(firmwareVersion || "").trim());
+  if (!match) return RESERVED_STORAGE_BYTES;
+  const [major, minor, patch] = match.slice(1).map(Number);
+  if (![major, minor, patch].every(Number.isSafeInteger)) return RESERVED_STORAGE_BYTES;
+  return major > 2 || (major === 2 && minor >= 3) ? 1572864 : RESERVED_STORAGE_BYTES;
+}
+
+function formatFsInfo(fs, firmwareVersion = "") {
   if (!fs) return { usedStorageLabel: "--", totalStorageLabel: "--", storagePercent: 0 };
+  const reserved = storageReservedBytes(firmwareVersion);
   const rawUsed = Math.max(0, fs.totalBytes - fs.freeBytes);
-  const used = Math.max(0, rawUsed - RESERVED_STORAGE_BYTES);
-  const total = Math.max(0, fs.totalBytes - RESERVED_STORAGE_BYTES);
+  const used = Math.max(0, rawUsed - reserved);
+  const total = Math.max(0, fs.totalBytes - reserved);
   return {
     usedStorageLabel: used === 0 ? "0K" : formatBytes(used),
     totalStorageLabel: total === 0 ? "0K" : formatBytes(total),
