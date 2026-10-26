@@ -69,10 +69,7 @@ const TAGS_MAX_COUNT = 5;
 const CONTROL_INFO_BYTES = 8;
 const FILE_TRANSFER_FREE_MARGIN_BYTES = 50 * 1024;
 const RESERVED_STORAGE_BYTES = 2404352;
-const FIRMWARE_CATALOG_URL = "https://api.monicardserv.com/app-config/v1/firmware/manifest.json";
 const FIRMWARE_PRODUCTS = ["gen1", "max", "pro"];
-let firmwareCatalog = null;
-let firmwareMetadataBusy = false;
 const MOTION_MAX_DURATION_MS = 10000;
 const MOTION_MAX_FRAME_RATE = 20;
 const CAROUSEL_PRESETS = [3, 10, 30, 60];
@@ -317,7 +314,7 @@ const i18n = {
     helpFirmwareTitle: "韌體更新",
     helpFirmwareBody: "韌體更新約需數分鐘。開始後請保持此頁面開啟，不要切換頁面、關閉瀏覽器、讓電腦睡眠或關閉設備電源。更新完成後等待約 10 秒，再按設備電源鍵開機，Web 版會嘗試重新連線驗證。",
     helpStorageTitle: "容量與刪除",
-    helpStorageBody: "設備容量顯示會保留安全餘量，避免上傳時把空間塞滿。官方小程序也不能列出或刪除已上傳素材；v1.3.0 以上固件可在設備端進行素材排序。",
+    helpStorageBody: "容量顯示會依韌體版本扣除系統保留量。上傳前會另外檢查設備回報的剩餘空間並預留安全餘量；顯示數值的調整不會增加實體容量。網頁目前無法列出或刪除設備內素材。",
     unnamedDevice: "設備名稱",
     online: "在線",
     disconnected: "已中斷連線",
@@ -595,7 +592,7 @@ const i18n = {
     helpFirmwareTitle: "Firmware update",
     helpFirmwareBody: "Firmware update takes a few minutes. Keep this page open after starting; do not switch pages, close the browser, let the computer sleep, or power off the device. After upload finishes, wait about 10 seconds, press the power button, and the web app will try to reconnect and verify.",
     helpStorageTitle: "Storage and deletion",
-    helpStorageBody: "Storage display keeps a safety margin so uploads do not fill the device completely. The official mini program also cannot list or delete uploaded assets. Firmware v1.3.0 and later can sort assets on the device.",
+    helpStorageBody: "Storage display excludes system-reserved space based on the firmware version. Uploads separately check the free space reported by the device and keep a safety margin. Display adjustments do not increase physical storage. The web app cannot list or delete stored assets.",
     unnamedDevice: "Device name",
     online: "Online",
     disconnected: "Disconnected",
@@ -873,7 +870,7 @@ const i18n = {
     helpFirmwareTitle: "ファームウェア更新",
     helpFirmwareBody: "ファームウェア更新には数分かかります。開始後はページを切り替えず、ブラウザを閉じず、PCをスリープさせず、端末の電源を切らないでください。アップロード完了後、約10秒待って電源ボタンを押すと、Web版が再接続と確認を試みます。",
     helpStorageTitle: "容量と削除",
-    helpStorageBody: "容量表示には安全マージンを含め、端末の空き容量を使い切らないようにしています。公式ミニプログラムでもアップロード済み素材の一覧表示や削除はできません。v1.3.0 以降のファームウェアでは端末側で素材の並び替えができます。",
+    helpStorageBody: "容量表示では、ファームウェアに応じてシステム予約領域を差し引いています。転送前には端末が報告する空き容量を別途確認し、余裕を確保します。表示の調整で実際の容量が増えるわけではありません。Web版では保存済み素材の一覧表示や削除はできません。",
     unnamedDevice: "端末名",
     online: "オンライン",
     disconnected: "切断済み",
@@ -955,7 +952,10 @@ function writeStoredValue(key, value) {
 
 const firmwareMessages = {
   "zh-Hant": {
-    firmwareOfficialFlow: "可查詢官方韌體資訊，或匯入由韌體工具取得的資訊檔，再選擇本機更新檔。",
+    mediaManageTitle: "設備端素材管理",
+    featureFirmwareRequired: "此功能需要韌體 {version} 或更新版本。",
+    featureFirmwareUnknown: "尚未確認此設備的功能相容性，請以設備回應為準。",
+    firmwareOfficialFlow: "僅支援手動選擇本機 .bin 更新檔。檔案結構與 CRC 檢查無法確認官方來源或設備相容性，請先確認檔案適用於此設備。",
     firmwareProduct: "設備系列",
     firmwareChooseProduct: "請選擇實際設備系列",
     firmwareProductGen1: "MoniCard 一代",
@@ -969,13 +969,13 @@ const firmwareMessages = {
     firmwareRelease: "目錄版本：{version} · 檔案：{name} · 大小：{size}",
     firmwareMetadataIncomplete: "此版本缺少大小或 SHA-256 資訊，無法核驗更新檔。",
     firmwareTargetVersion: "預期更新版本（選填）",
-    firmwareTargetHelp: "有韌體資訊時會自動填入；沒有時請依官方說明填寫，不要從檔名猜測。",
+    firmwareTargetHelp: "請依更新檔提供者的正式說明填寫；留空時，更新後只會讀回版本，不會宣告版本核驗成功。",
     firmwareInvalidPackage: "這不是有效的設備 OTA 更新包，或更新包已損壞。",
     firmwarePackageVersion: "不支援此 OTA 更新包格式版本。",
     firmwareSizeMismatch: "更新檔大小與韌體資訊不符。",
     firmwareHashMismatch: "更新檔 SHA-256 與韌體資訊不符，已停止更新。",
     firmwareProductMismatch: "韌體資訊與選擇的設備系列、型號或硬體版本不符。",
-    firmwareCheckingFile: "正在檢查更新包與 SHA-256…",
+    firmwareCheckingFile: "正在檢查更新包結構與內部 CRC…",
     firmwareFileVerified: "更新包結構與內部 CRC 正確；大小及 SHA-256 與載入資訊一致。目標版本：{version}",
     firmwareStructureVerified: "更新包結構與內部 CRC 正確；未核對官方 SHA-256 或設備系列。",
     firmwareVersionMismatch: "更新驗證失敗：預期 {expected}，設備回報 {actual}。",
@@ -986,7 +986,10 @@ const firmwareMessages = {
     firmwareUpdateFailed: "韌體更新失敗"
   },
   en: {
-    firmwareOfficialFlow: "Check the official firmware catalog, or import a catalog from the firmware tool, then choose a local update file.",
+    mediaManageTitle: "Manage assets on the device",
+    featureFirmwareRequired: "This feature requires firmware {version} or later.",
+    featureFirmwareUnknown: "Feature compatibility has not been confirmed for this device. Check the device response.",
+    firmwareOfficialFlow: "Choose a local .bin update file. Structure and CRC checks cannot confirm its official origin or compatibility. Make sure the file is intended for this device.",
     firmwareProduct: "Device series",
     firmwareChooseProduct: "Select your device series",
     firmwareProductGen1: "MoniCard (1st generation)",
@@ -1000,13 +1003,13 @@ const firmwareMessages = {
     firmwareRelease: "Catalog version: {version} · File: {name} · Size: {size}",
     firmwareMetadataIncomplete: "This release has no size or SHA-256 information, so its update file cannot be verified.",
     firmwareTargetVersion: "Expected version (optional)",
-    firmwareTargetHelp: "Filled in from the catalog when available. Otherwise, use the official release information rather than guessing from the filename.",
+    firmwareTargetHelp: "Use the version stated by the firmware provider. If left blank, the version will be read after updating, but the target version cannot be verified.",
     firmwareInvalidPackage: "This is not a valid device OTA package, or the package is damaged.",
     firmwarePackageVersion: "This OTA package format version is not supported.",
     firmwareSizeMismatch: "The update file size does not match the firmware information.",
     firmwareHashMismatch: "The update file SHA-256 does not match the firmware information. Update stopped.",
     firmwareProductMismatch: "The firmware information does not match the selected device series, model, or hardware revision.",
-    firmwareCheckingFile: "Checking the OTA package and SHA-256…",
+    firmwareCheckingFile: "Checking package structure and internal CRC…",
     firmwareFileVerified: "Package structure and internal CRC passed; size and SHA-256 match the loaded catalog. Target version: {version}",
     firmwareStructureVerified: "Package structure and internal CRC passed. Official SHA-256 and device series have not been verified.",
     firmwareVersionMismatch: "Update verification failed: expected {expected}, but the device reports {actual}.",
@@ -1017,7 +1020,10 @@ const firmwareMessages = {
     firmwareUpdateFailed: "Firmware update failed"
   },
   ja: {
-    firmwareOfficialFlow: "公式のファームウェア情報を確認するか、ファームウェアツールで取得した情報ファイルを読み込んでから、更新ファイルを選択してください。",
+    mediaManageTitle: "端末側での素材管理",
+    featureFirmwareRequired: "この機能にはファームウェア {version} 以降が必要です。",
+    featureFirmwareUnknown: "この端末での対応状況は未確認です。端末の応答を確認してください。",
+    firmwareOfficialFlow: "ローカルの .bin 更新ファイルを選択してください。構造とCRCの検査だけでは、公式ファイルであることや端末との互換性は確認できません。必ずこの端末に対応したファイルを使用してください。",
     firmwareProduct: "デバイスシリーズ",
     firmwareChooseProduct: "お使いのデバイスシリーズを選択",
     firmwareProductGen1: "MoniCard（初代）",
@@ -1031,13 +1037,13 @@ const firmwareMessages = {
     firmwareRelease: "掲載バージョン：{version} · ファイル：{name} · サイズ：{size}",
     firmwareMetadataIncomplete: "このバージョンにはサイズまたはSHA-256の情報がなく、更新ファイルを照合できません。",
     firmwareTargetVersion: "更新先のバージョン（任意）",
-    firmwareTargetHelp: "情報ファイルがある場合は自動入力されます。ない場合は公式の案内に従って入力してください。ファイル名から推測しないでください。",
+    firmwareTargetHelp: "配布元の案内に記載されたバージョンを入力してください。空欄の場合、更新後のバージョンは読み取りますが、更新先との照合は行いません。",
     firmwareInvalidPackage: "有効なOTA更新パッケージではないか、ファイルが破損しています。",
     firmwarePackageVersion: "このOTAパッケージの形式バージョンには対応していません。",
     firmwareSizeMismatch: "更新ファイルのサイズがファームウェア情報と一致しません。",
     firmwareHashMismatch: "更新ファイルのSHA-256がファームウェア情報と一致しないため、更新を中止しました。",
     firmwareProductMismatch: "ファームウェア情報が選択したシリーズ、モデル、またはハードウェアのバージョンと一致しません。",
-    firmwareCheckingFile: "更新パッケージとSHA-256を確認しています…",
+    firmwareCheckingFile: "パッケージの構造と内部CRCを確認しています…",
     firmwareFileVerified: "パッケージの構造と内部CRCを確認しました。サイズとSHA-256も読み込んだ情報と一致しています。更新先：{version}",
     firmwareStructureVerified: "パッケージの構造と内部CRCを確認しました。公式のSHA-256とデバイスシリーズは照合していません。",
     firmwareVersionMismatch: "更新後の確認に失敗しました。予定：{expected}、デバイスのバージョン：{actual}。",
@@ -1100,7 +1106,53 @@ const deviceUpdateMessages = {
   }
 };
 for (const [locale, messages] of Object.entries(deviceUpdateMessages)) Object.assign(i18n[locale], messages);
-const CONTACT_TYPES = ["QQ", "WeChat", "LINE", "Instagram", "TikTok", "KakaoTalk", "Discord", "Telegram", "WhatsApp", "email", "website"];
+const CONTACT_TYPES = ["QQ", "WeChat", "LINE", "Instagram", "X", "TikTok", "YouTube", "KakaoTalk", "Discord", "Telegram", "WhatsApp", "email", "website"];
+
+const otaMessages = {
+  "zh-Hant": {
+    otaStorageFull: "設備儲存空間不足，請先在設備上清理素材後再試。",
+    otaModelMismatch: "更新檔與設備型號不符，已停止更新。請確認檔案適用的設備。",
+    otaVersionIncompatible: "設備不接受此韌體版本，已停止更新。請確認版本相容性。",
+    otaPackageDamaged: "設備判定更新包損壞，已停止更新。請重新取得完整檔案。",
+    otaAlreadyUpdating: "設備正在更新中，請勿重複傳送或強制斷電。",
+    otaInterrupted: "設備回報傳輸中斷，請確認連線後重新傳送。",
+    otaUnknown: "設備回報更新錯誤，代碼：{code}。請保留代碼以便確認原因。",
+    otaInvalidResponse: "設備的更新回應格式異常，請重新連線後再試。",
+    otaRestart: "{reason} 請重新開始傳輸。",
+    otaProgressInvalid: "設備回報的接收進度不一致，請重新開始傳輸。",
+    mediaDeviceManage: "支援此功能的韌體可在設備上管理素材：切換到目標素材，按背面按鍵進入選單刪除；在「素材排序」中調整播放順序並自動儲存。選單與操作依機型、韌體而異。",
+    mediaWriteWait: "傳輸完成後，請再等約 2–3 秒，並在設備上確認顯示。網頁無法確認設備已完成寫入或播放。"
+  },
+  en: {
+    otaStorageFull: "Not enough device storage. Delete some assets on the device before trying again.",
+    otaModelMismatch: "The update file does not match this device model. Update stopped. Check that the file is intended for this device.",
+    otaVersionIncompatible: "The device rejected this firmware version. Update stopped. Check version compatibility.",
+    otaPackageDamaged: "The device reported a damaged update package. Update stopped. Obtain a complete copy of the file.",
+    otaAlreadyUpdating: "The device is already updating. Do not resend the file or force it to power off.",
+    otaInterrupted: "The device reported an interrupted transfer. Check the connection and send the file again.",
+    otaUnknown: "The device reported update error {code}. Keep this code for troubleshooting.",
+    otaInvalidResponse: "Invalid update response from the device. Reconnect and try again.",
+    otaRestart: "{reason} Restart the transfer.",
+    otaProgressInvalid: "The device reported inconsistent receive progress. Restart the transfer.",
+    mediaDeviceManage: "On supported firmware, switch to the asset on the device and press the rear button to open the menu and delete it. Use Asset Order to rearrange playback; changes are saved automatically. Menus and controls vary by model and firmware.",
+    mediaWriteWait: "After transfer, allow about 2–3 seconds and check playback on the device. The web app cannot verify that the device has finished saving or playing the asset."
+  },
+  ja: {
+    otaStorageFull: "端末の空き容量が不足しています。端末側で不要な素材を削除してからお試しください。",
+    otaModelMismatch: "更新ファイルが端末の機種と一致しないため、更新を停止しました。対応機種を確認してください。",
+    otaVersionIncompatible: "端末がこのファームウェアのバージョンを受け付けなかったため、更新を停止しました。互換性を確認してください。",
+    otaPackageDamaged: "端末が更新パッケージの破損を検出したため、更新を停止しました。完全なファイルを入手し直してください。",
+    otaAlreadyUpdating: "端末はすでに更新中です。ファイルを再送したり、電源を強制的に切ったりしないでください。",
+    otaInterrupted: "端末から転送中断が報告されました。接続を確認して、もう一度転送してください。",
+    otaUnknown: "端末から更新エラーが報告されました。コード：{code}。原因の確認に必要なため、このコードを控えてください。",
+    otaInvalidResponse: "端末からの更新応答が不正です。接続し直してお試しください。",
+    otaRestart: "{reason} 転送を最初からやり直してください。",
+    otaProgressInvalid: "端末の受信状況が一致しません。転送を最初からやり直してください。",
+    mediaDeviceManage: "対応ファームウェアでは、端末で対象の素材を表示し、背面ボタンでメニューを開いて削除できます。「素材の並べ替え」で再生順を変更すると自動保存されます。メニューや操作は機種・ファームウェアによって異なります。",
+    mediaWriteWait: "転送後は2〜3秒ほど待ち、端末で表示を確認してください。Web版では端末側の保存完了や再生結果までは確認できません。"
+  }
+};
+for (const [locale, messages] of Object.entries(otaMessages)) Object.assign(i18n[locale], messages);
 
 function productFromSerial(sn) {
   const serial = String(sn || "").trim().toUpperCase();
@@ -1113,6 +1165,28 @@ function productFromResponse(bytes) {
 
 function productLabel(product) {
   return product === "gen1" ? t("productGen1") : product === "max" ? "MoniCard Max" : product === "pro" ? "MoniCard Pro" : t("productUnknown");
+}
+
+function settingAvailability(key, device) {
+  if (key !== "disableAmbienceLight") return { supported: true, minimum: "" };
+  const product = productFromSerial(device?.sn) || device?.detectedFirmwareProduct || "";
+  if (product !== "gen1") return { supported: null, minimum: "" };
+  const minimum = "1.1.0";
+  const version = normalizeFirmwareVersion(device?.firmwareVersion);
+  if (!version) return { supported: null, minimum };
+  const parts = version.split(".").map(Number);
+  if (!parts.every(Number.isSafeInteger)) return { supported: null, minimum };
+  const required = [1, 1, 0];
+  for (let i = 0; i < Math.max(parts.length, required.length); i++) {
+    if ((parts[i] || 0) !== (required[i] || 0)) return { supported: (parts[i] || 0) > (required[i] || 0), minimum };
+  }
+  return { supported: true, minimum };
+}
+
+function settingAvailabilityHint(key, device) {
+  const availability = settingAvailability(key, device);
+  if (availability.supported === false) return t("featureFirmwareRequired", { version: availability.minimum });
+  return availability.supported === null ? t("featureFirmwareUnknown") : "";
 }
 
 function parseDeviceLanguage(data) {
@@ -1598,9 +1672,7 @@ const initialState = () => ({
     mediaCaptionItalic: false,
     mediaCaptionDirection: "horizontal",
     mediaClipStartMs: 0,
-    mediaClipEndMs: MOTION_MAX_DURATION_MS,
-    firmwareAdvancedVisible: false,
-    firmwareRiskAccepted: false
+    mediaClipEndMs: MOTION_MAX_DURATION_MS
   },
   firmwareBusy: false,
   mediaBusy: false,
@@ -1677,11 +1749,12 @@ function setBanner(message = "") {
 }
 
 function formatError(error, fallback = t("saveFailed")) {
+  if (error?.name === "MoniCardOtaError") return error.message;
   const message = String(error && (error.message || error.name) || fallback);
   if (/User cancelled|cancelled|canceled|NotFoundError/i.test(message)) return t("errorCanceled");
   if (message === t("refreshRequiresConnection") || message === t("errorNoConnection")) return message;
   if (/GATT|Bluetooth|NetworkError|disconnected/i.test(message)) return t("errorBluetooth", { fallback });
-  if (/timeout|超时/i.test(message)) return t("errorTimeout", { fallback });
+  if (/timeout|超时|逾時/i.test(message)) return t("errorTimeout", { fallback });
   return t("errorGeneric", { fallback, message: localizeKnownErrorMessage(message) });
 }
 
@@ -2002,61 +2075,6 @@ function normalizeFirmwareVersion(version) {
   return /^\d+(?:\.\d+){1,3}$/.test(value) ? value : "";
 }
 
-function parseFirmwareCatalog(data) {
-  if (data?.schemaVersion !== 1 || !Array.isArray(data.releases) || !data.releases.length || data.releases.length > 256) {
-    throw new Error(t("firmwareCatalogInvalid"));
-  }
-  const releases = data.releases.map((release) => {
-    if (!release || !FIRMWARE_PRODUCTS.includes(release.product) || typeof release.model !== "string" ||
-        !release.model.trim() || typeof release.hardware !== "string" || !release.hardware.trim() ||
-        !normalizeFirmwareVersion(release.version)) throw new Error(t("firmwareCatalogInvalid"));
-    const size = release.size ?? 0;
-    const sha256 = String(release.sha256 || "").trim().toLowerCase();
-    if (!Number.isSafeInteger(size) || size < 0 || (sha256 && !/^[a-f0-9]{64}$/.test(sha256))) {
-      throw new Error(t("firmwareCatalogInvalid"));
-    }
-    return { ...release, size, sha256, version: normalizeFirmwareVersion(release.version) };
-  });
-  return { schemaVersion: 1, releases };
-}
-
-function matchingFirmwareRelease(catalog, device, product) {
-  if (!catalog || !device || !FIRMWARE_PRODUCTS.includes(product)) return null;
-  const query = firmwareQueryData(device);
-  return catalog.releases.filter((release) => release.product === product && release.model === query.model &&
-    release.hardware === query.hardware).sort((a, b) => {
-    const left = a.version.split(".").map(Number);
-    const right = b.version.split(".").map(Number);
-    for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
-      const diff = (right[index] || 0) - (left[index] || 0);
-      if (diff) return diff;
-    }
-    return 0;
-  })[0] || null;
-}
-
-async function fetchFirmwareCatalog() {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12000);
-  const readJson = async (url) => {
-    const response = await fetch(url, { signal: controller.signal, credentials: "omit", cache: "no-store" });
-    if (!response.ok) throw new Error(t("firmwareCatalogUnavailable"));
-    const text = await response.text();
-    if (text.length > 1024 * 1024) throw new Error(t("firmwareCatalogInvalid"));
-    return JSON.parse(text);
-  };
-  try {
-    const manifest = await readJson(FIRMWARE_CATALOG_URL);
-    if (manifest.schemaVersion !== 1 || typeof manifest.path !== "string" ||
-        !/^\/app-config\/v1\/firmware\/releases\/[a-f0-9]{64}\.json$/.test(manifest.path)) {
-      throw new Error(t("firmwareCatalogInvalid"));
-    }
-    return parseFirmwareCatalog(await readJson(new URL(manifest.path, FIRMWARE_CATALOG_URL).href));
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
 function validateOfflineFirmwarePackage(bytes) {
   // SiFli FCES container: 12-byte header, 6-byte image entries, then image data.
   if (bytes.length < 12 || readUint32(bytes, 0) !== 0x53454346) throw new Error(t("firmwareInvalidPackage"));
@@ -2144,22 +2162,24 @@ function otaPayload(message) {
 
 function otaErrorMessage(code) {
   const map = {
-    3: "Storage is full",
-    5: "Firmware does not match this device",
-    6: "Firmware version is incompatible",
-    7: "Firmware version is incompatible",
-    8: "Firmware file is damaged",
-    9: "Firmware file is damaged",
-    10: "Device is already updating",
-    13: "Transfer was interrupted"
+    3: "otaStorageFull", 5: "otaModelMismatch", 6: "otaVersionIncompatible",
+    7: "otaVersionIncompatible", 8: "otaPackageDamaged", 9: "otaPackageDamaged",
+    10: "otaAlreadyUpdating", 13: "otaInterrupted"
   };
-  return map[code] || `Device returned error ${code}`;
+  return t(map[code] || "otaUnknown", { code });
+}
+
+function otaError(message, deviceCode = null) {
+  const error = new Error(message);
+  error.name = "MoniCardOtaError";
+  error.deviceCode = deviceCode;
+  return error;
 }
 
 function parseOtaPackageStart(message) {
   const payload = otaPayload(message);
   const resultCode = payload.length >= 2 ? readUint16(payload, 0) : -1;
-  if (resultCode !== 0) throw new Error(otaErrorMessage(resultCode));
+  if (resultCode !== 0) throw otaError(resultCode < 0 ? t("otaInvalidResponse") : otaErrorMessage(resultCode), resultCode);
   return {
     responseFrequency: payload.length >= 3 ? payload[2] : 1,
     completedCount: payload.length >= 8 ? readUint32(payload, 4) : 0
@@ -2171,15 +2191,18 @@ function parseOtaPackagePacket(message, expectedIndex) {
   const resultCode = payload.length >= 2 ? readUint16(payload, 0) : -1;
   const retransmission = payload.length >= 3 ? payload[2] : 0;
   const completedCount = payload.length >= 8 ? readUint32(payload, 4) : 0;
-  if (resultCode !== 0) throw new Error(retransmission ? `${otaErrorMessage(resultCode)}. Please restart the update.` : otaErrorMessage(resultCode));
-  if (completedCount && completedCount < expectedIndex) throw new Error("Device update progress is inconsistent. Please restart the update.");
+  if (resultCode !== 0) {
+    const reason = resultCode < 0 ? t("otaInvalidResponse") : otaErrorMessage(resultCode);
+    throw otaError(retransmission ? t("otaRestart", { reason }) : reason, resultCode);
+  }
+  if (completedCount && completedCount < expectedIndex) throw otaError(t("otaProgressInvalid"));
   return { resultCode, retransmission, completedCount };
 }
 
 function parseOtaPackageEnd(message) {
   const payload = otaPayload(message);
   const resultCode = payload.length >= 2 ? readUint16(payload, 0) : -1;
-  if (resultCode !== 0) throw new Error(otaErrorMessage(resultCode));
+  if (resultCode !== 0) throw otaError(resultCode < 0 ? t("otaInvalidResponse") : otaErrorMessage(resultCode), resultCode);
   return resultCode;
 }
 
@@ -2565,6 +2588,11 @@ class MoniCardWebBluetooth {
   async writeControlSettings(settings) {
     await this.ensureConnected();
     const normalized = normalizeSettings(settings);
+    const device = getCurrentDevice();
+    const availability = settingAvailability("disableAmbienceLight", device);
+    if (availability.supported === false && normalized.disableAmbienceLight !== state.deviceSettings.disableAmbienceLight) {
+      throw new Error(t("featureFirmwareRequired", { version: availability.minimum }));
+    }
     const message = await this.control(encodeWriteControlInfo(normalized.controlInfoBytes), CONTROL_COMMAND.CONTROL_INFO_RESPONSE, 5000);
     const status = statusFromResponse(message);
     if (status !== 0) throw new Error(`寫入設備設定失敗(${status})`);
@@ -4055,6 +4083,11 @@ function renderMedia() {
       <p class="muted">${t("mediaHelp")}</p>
       <p class="muted">${t("mediaProcessHelp")}</p>
       <p class="muted">${t("mediaOfficialNote")}</p>
+      <details>
+        <summary>${t("mediaManageTitle")}</summary>
+        <p class="muted">${t("mediaDeviceManage")}</p>
+        <p class="muted">${t("mediaWriteWait")}</p>
+      </details>
       <p class="muted">${t("mediaKeepForeground")}</p>
       <div class="field">
         <label>${t("fileType")}</label>
@@ -4762,8 +4795,8 @@ function renderDeviceSettings() {
       </div>
       <div id="switches">${controls.map(([key, title, desc]) => `
         <label class="switch-row">
-          <span><strong>${title}</strong><br><span class="muted">${desc}</span></span>
-          <input class="switch" data-setting="${key}" type="checkbox" ${state.deviceSettings[key] ? "" : "checked"}>
+          <span><strong>${title}</strong><br><span class="muted">${desc}</span>${settingAvailabilityHint(key, getCurrentDevice()) ? `<br><span class="muted" data-setting-hint="${key}">${escapeHtml(settingAvailabilityHint(key, getCurrentDevice()))}</span>` : ""}</span>
+          <input class="switch" data-setting="${key}" type="checkbox" ${state.deviceSettings[key] ? "" : "checked"} ${settingAvailability(key, getCurrentDevice()).supported === false ? "disabled" : ""}>
         </label>
       `).join("")}
         <div class="carousel-setting">
@@ -4809,6 +4842,11 @@ function renderDeviceSettings() {
     input.addEventListener("change", async () => {
       const previousChecked = !input.checked;
       if (settingsIoBusy) { input.checked = previousChecked; return; }
+      if (settingAvailability(input.dataset.setting, getCurrentDevice()).supported === false) {
+        input.checked = previousChecked;
+        toast(settingAvailabilityHint(input.dataset.setting, getCurrentDevice()));
+        return;
+      }
       settingsIoBusy = true;
       setSettingsControlsBusy(true);
       const next = { ...state.deviceSettings, [input.dataset.setting]: !input.checked };
@@ -4848,10 +4886,13 @@ function renderDeviceSettings() {
 function setSettingsControlsBusy(busy) {
   for (const selector of ["#connectBtn", "#disconnectBtn"]) {
     const button = $(selector);
-    if (button) button.disabled = busy || state.firmwareBusy || state.mediaBusy || firmwareMetadataBusy;
+    if (button) button.disabled = busy || state.firmwareBusy || state.mediaBusy;
   }
   if (state.currentRoute !== "settings") return;
   view.querySelectorAll("button, input, select").forEach((element) => { element.disabled = busy; });
+  view.querySelectorAll("[data-setting]").forEach((element) => {
+    element.disabled = busy || settingAvailability(element.dataset.setting, getCurrentDevice()).supported === false;
+  });
   const select = $("#deviceLanguageSelect");
   if (select) select.disabled = busy || !ble.connection?.languageInfo;
 }
@@ -5054,15 +5095,10 @@ function bindReceivedCards(options = {}) {
 
 function renderFirmware() {
   const device = getCurrentDevice();
-  const settings = ensureAppSettings();
-  const advancedVisible = Boolean(settings.firmwareAdvancedVisible);
-  const riskAccepted = Boolean(settings.firmwareRiskAccepted);
   const currentVersion = getCurrentDevice()?.firmwareVersion || "--";
   const detected = productFromSerial(device?.sn) || device?.detectedFirmwareProduct || "";
   if (device && detected && !device.firmwareProduct) updateDevice(device.id, { firmwareProduct: detected });
   const product = device?.firmwareProduct || detected;
-  const release = matchingFirmwareRelease(firmwareCatalog, device, product);
-  const notes = release?.releaseNotesI18n?.[currentLocale()] || release?.releaseNotes || "";
   view.innerHTML = `
     <div class="panel form">
       <h2>${t("firmwareUpgrade")}</h2>
@@ -5077,25 +5113,15 @@ function renderFirmware() {
         </select>
         <p class="muted">${escapeHtml(detected ? t("productDetected", { product: productLabel(detected) }) : t("productUnknown"))}${detected && product !== detected ? ` · ${escapeHtml(t("productConflict"))}` : ""}</p>
       </div>
-      <div class="actions">
-        <button id="checkFirmwareBtn" class="secondary-btn" type="button">${t("firmwareCheck")}</button>
-        <button id="importFirmwareMetadataBtn" class="secondary-btn" type="button">${t("firmwareImportMetadata")}</button>
-      </div>
-      <p id="firmwareCatalogStatus" class="muted">${escapeHtml(release ? t("firmwareRelease", { version: release.version, name: release.fileName || "--", size: formatBytes(release.size) }) : firmwareCatalog ? t(product ? "firmwareNoRelease" : "firmwareCatalogReady") : "")}</p>
-      ${notes ? `<p class="muted" style="white-space:pre-line">${escapeHtml(notes)}</p>` : ""}
-      <label class="switch-row">
-        <span><strong>${t("firmwareAdvanced")}</strong><br><span class="muted">${t("firmwareAdvancedHelp")}</span></span>
-        <input id="firmwareAdvancedToggle" class="switch" type="checkbox" ${advancedVisible ? "checked" : ""}>
-      </label>
-      <div id="firmwareAdvancedPanel" class="${advancedVisible ? "" : "hidden"}">
+      <div>
         <div class="field">
           <label for="firmwareTargetVersion">${t("firmwareTargetVersion")}</label>
-          <input id="firmwareTargetVersion" value="${escapeAttr(release?.version || "")}" placeholder="v2.2.0" ${release ? "readonly" : ""}>
+          <input id="firmwareTargetVersion" placeholder="v2.3.0">
           <span class="muted">${t("firmwareTargetHelp")}</span>
         </div>
-        <label class="check-pill full"><input id="firmwareRiskAccepted" type="checkbox" ${riskAccepted ? "checked" : ""}>${t("firmwareConfirmOfficial")}</label>
+        <label class="check-pill full"><input id="firmwareRiskAccepted" type="checkbox">${t("firmwareConfirmOfficial")}</label>
         <div class="actions">
-          <button id="pickFirmwareBtn" class="primary-btn" type="button" ${riskAccepted ? "" : "disabled"}>${t("pickFirmware")}</button>
+          <button id="pickFirmwareBtn" class="primary-btn" type="button" disabled>${t("pickFirmware")}</button>
         </div>
       </div>
       <div class="progress"><span id="firmwareProgress"></span></div>
@@ -5107,69 +5133,25 @@ function renderFirmware() {
     updateDevice(getCurrentDevice().id, { firmwareProduct: event.target.value });
     renderFirmware();
   });
-  $("#checkFirmwareBtn").addEventListener("click", async (event) => {
-    const status = $("#firmwareCatalogStatus");
-    firmwareMetadataBusy = true;
-    view.querySelectorAll("button, input, select").forEach((element) => { element.disabled = true; });
-    status.textContent = t("firmwareCatalogLoading");
-    let failed = false;
-    try {
-      firmwareCatalog = await fetchFirmwareCatalog();
-    } catch {
-      failed = true;
-    } finally {
-      firmwareMetadataBusy = false;
-      if (state.currentRoute === "firmware" && !state.firmwareBusy) {
-        renderFirmware();
-        if (failed) $("#firmwareCatalogStatus").textContent = t("firmwareCatalogUnavailable");
-      }
-    }
-  });
-  $("#importFirmwareMetadataBtn").addEventListener("click", () => {
-    filePicker.accept = ".json,application/json";
-    filePicker.removeAttribute("capture");
-    filePicker.value = "";
-    filePicker.onchange = async () => {
-      const file = filePicker.files[0];
-      if (!file) return;
-      firmwareMetadataBusy = true;
-      view.querySelectorAll("button, input, select").forEach((element) => { element.disabled = true; });
-      try {
-        if (file.size > 1024 * 1024) throw new Error(t("firmwareCatalogInvalid"));
-        firmwareCatalog = parseFirmwareCatalog(JSON.parse(await file.text()));
-      } catch {
-        toast(t("firmwareCatalogInvalid"));
-      } finally {
-        firmwareMetadataBusy = false;
-        if (state.currentRoute === "firmware" && !state.firmwareBusy) renderFirmware();
-        filePicker.value = "";
-      }
-    };
-    filePicker.click();
-  });
-  $("#firmwareAdvancedToggle").addEventListener("change", (event) => {
-    ensureAppSettings().firmwareAdvancedVisible = event.target.checked;
-    saveState();
-    renderFirmware();
-  });
   $("#firmwareRiskAccepted")?.addEventListener("change", (event) => {
-    ensureAppSettings().firmwareRiskAccepted = event.target.checked;
-    saveState();
     $("#pickFirmwareBtn").disabled = !event.target.checked;
   });
   $("#pickFirmwareBtn").addEventListener("click", () => {
-    if (!ensureAppSettings().firmwareRiskAccepted) return toast(t("firmwareRequireConfirm"));
+    if (!$("#firmwareRiskAccepted").checked) return toast(t("firmwareRequireConfirm"));
     if (!FIRMWARE_PRODUCTS.includes(getCurrentDevice()?.firmwareProduct)) return toast(t("firmwareChooseProduct"));
+    if (!isDeviceLive(getCurrentDevice())) return toast(t("firmwareDeviceChanged"));
     filePicker.accept = ".bin";
+    filePicker.value = "";
     filePicker.removeAttribute("capture");
     filePicker.onchange = async () => {
       const file = filePicker.files[0];
       if (!file) return;
+      if (state.currentRoute !== "firmware" || state.firmwareBusy || state.mediaBusy || !$("#firmwareRiskAccepted")?.checked) { filePicker.value = ""; return; }
+      $("#toast").classList.remove("show");
       const deviceBeforeUpdate = getCurrentDevice();
       const selectedProduct = deviceBeforeUpdate?.firmwareProduct;
-      const selectedRelease = matchingFirmwareRelease(firmwareCatalog, deviceBeforeUpdate, selectedProduct);
       const targetInput = $("#firmwareTargetVersion").value.trim();
-      const targetVersion = selectedRelease?.version || normalizeFirmwareVersion(targetInput);
+      const targetVersion = normalizeFirmwareVersion(targetInput);
       if (targetInput && !targetVersion) {
         filePicker.value = "";
         return toast(t("firmwareInvalidTarget"));
@@ -5179,17 +5161,19 @@ function renderFirmware() {
       view.querySelectorAll("button, input, select").forEach((element) => { element.disabled = true; });
       try {
         if (!deviceBeforeUpdate || !isDeviceLive(deviceBeforeUpdate)) throw new Error(t("firmwareDeviceChanged"));
-        if (firmwareCatalog && !selectedRelease) throw new Error(t("firmwareNoRelease"));
         $("#firmwareProgress").style.width = "0%";
         $("#firmwareLog").textContent = t("firmwareCheckingFile");
-        await validateFirmwareFile(file, selectedRelease, deviceBeforeUpdate, selectedProduct);
-        $("#firmwareLog").textContent = `${t("firmwareReady", { name: file.name, size: formatBytes(file.size) })}\n${t(selectedRelease ? "firmwareFileVerified" : "firmwareStructureVerified", { version: targetVersion })}`;
-        if (!confirm(t("confirmFirmwareUpdate"))) return;
+        await validateFirmwareFile(file, null, deviceBeforeUpdate, selectedProduct);
+        $("#firmwareLog").textContent = `${t("firmwareReady", { name: file.name, size: formatBytes(file.size) })}\n${t("firmwareStructureVerified")}`;
+        if (!confirm(t("confirmFirmwareUpdate"))) {
+          $("#firmwareLog").textContent = t("errorCanceled");
+          return;
+        }
         saveState();
         await ble.transferFirmwarePackage(file, ({ percent, message }) => {
           $("#firmwareProgress").style.width = `${percent}%`;
           $("#firmwareLog").textContent = message;
-        }, { release: selectedRelease, device: deviceBeforeUpdate, product: selectedProduct });
+        }, { device: deviceBeforeUpdate, product: selectedProduct });
         $("#firmwareProgress").style.width = "100%";
         $("#firmwareLog").textContent = t("firmwareReconnectHint");
         toast(t("firmwareTransferred"));
@@ -5202,17 +5186,13 @@ function renderFirmware() {
         saveState();
         renderNav();
         view.querySelectorAll("button, input, select").forEach((element) => { element.disabled = false; });
-        $("#firmwareTargetVersion").readOnly = Boolean(matchingFirmwareRelease(firmwareCatalog, getCurrentDevice(), getCurrentDevice()?.firmwareProduct));
-        $("#pickFirmwareBtn").disabled = !ensureAppSettings().firmwareRiskAccepted;
+        $("#firmwareRiskAccepted").checked = false;
+        $("#pickFirmwareBtn").disabled = true;
         filePicker.value = "";
       }
     };
     filePicker.click();
   });
-  if (firmwareMetadataBusy) {
-    view.querySelectorAll("button, input, select").forEach((element) => { element.disabled = true; });
-    $("#firmwareCatalogStatus").textContent = t("firmwareCatalogLoading");
-  }
 }
 
 async function verifyFirmwareAfterUpdate(deviceBeforeUpdate, targetVersion = "") {
@@ -5258,7 +5238,8 @@ function renderHelp() {
     [t("helpControlsTitle"), t("helpControlsBody")],
     [t("helpCarouselTitle"), t("helpCarouselBody")],
     [t("helpFirmwareTitle"), t("helpFirmwareBody")],
-    [t("helpStorageTitle"), t("helpStorageBody")]
+    [t("helpStorageTitle"), t("helpStorageBody")],
+    [t("mediaManageTitle"), `${t("mediaDeviceManage")} ${t("mediaWriteWait")}`]
   ];
   view.innerHTML = `
     <div class="panel">
